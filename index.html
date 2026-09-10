@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>台語文字轉語音</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <div class="top-row">
+    <div>
+      <h1>台語文字轉語音</h1>
+      <p class="subtitle">全漢字／全羅／羅馬字加調號數字，三種寫法互相同步；按「播放語音」播放教育部台語辭典真人錄音。</p>
+    </div>
+    <div class="top-row-actions">
+      <button id="helpToggle" type="button" title="使用說明">❓ 說明</button>
+      <button id="themeToggle" type="button" title="切換明亮／深色模式">🌙 深色</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="dictStatus">辭典載入中…</span>
+    <div class="status-actions">
+      <button id="reloadDictBtn" title="重新下載最新辭典資料">重新載入辭典</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="customStatus">尚未匯入自訂詞庫</span>
+    <div class="status-actions">
+      <label class="file-btn" for="customFileInput">匯入自訂詞庫（CSV／JSON）</label>
+      <input type="file" id="customFileInput" accept=".csv,.json,text/csv,application/json" hidden />
+      <button id="clearCustomBtn" disabled>清除自訂詞庫</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="audioStatus">尚未上傳自訂音檔</span>
+    <div class="status-actions">
+      <label class="file-btn" for="audioFileInput">上傳自訂音檔（可選多個）</label>
+      <input type="file" id="audioFileInput" accept="audio/*" multiple hidden />
+      <button id="clearAudioBtn" disabled>清除自訂音檔</button>
+    </div>
+  </div>
+
+  <div class="scheme-toggle">
+    <span>全羅書寫系統：</span>
+    <label><input type="radio" name="scheme" value="tailo" checked /> 教育部台羅（Tâi-lô）</label>
+    <label><input type="radio" name="scheme" value="poj" /> 白話字（POJ）</label>
+  </div>
+
+  <div class="field hanzi">
+    <label for="hanziInput">全漢字</label>
+    <textarea id="hanziInput" placeholder="請輸入台語漢字，例如：食飯"></textarea>
+  </div>
+
+  <div class="field">
+    <label id="tailoLabel" for="tailoInput">全羅（教育部台羅）</label>
+    <textarea id="tailoInput" placeholder="例如：tsia̍h-pn̄g"></textarea>
+  </div>
+
+  <div class="field">
+    <label for="numericInput">羅馬字加音調數字</label>
+    <textarea id="numericInput" placeholder="例如：tsiah8-png7"></textarea>
+  </div>
+
+  <p id="sourceIndicator" class="source-indicator"></p>
+
+  <div class="detail-panel">
+    <label>解析結果（點擊任一個詞可以修改讀音／補音檔，辭典沒收錄的字會標示警告）</label>
+    <div id="detailRow"></div>
+  </div>
+
+  <div id="tokenEditor" class="token-editor" hidden>
+    <p id="tokenEditorWarning" class="warning-text" hidden>⚠ 辭典沒有收錄這個詞，請提供讀音（音檔可留空）</p>
+    <div id="tokenEditorChoices" class="token-editor-choices" hidden></div>
+    <div class="token-editor-row">
+      <label for="tokenEditorHanzi">漢字</label>
+      <input type="text" id="tokenEditorHanzi" />
+    </div>
+    <div class="token-editor-row">
+      <label for="tokenEditorTrs">正確讀音（教育部台羅／白話字變音標，或數字調皆可）</label>
+      <input type="text" id="tokenEditorTrs" placeholder="例如 tsia̍h-pn̄g 或 tsiah8-png7" />
+    </div>
+    <div class="token-editor-row">
+      <label for="tokenEditorAudio">上傳這個詞的音檔（可選）</label>
+      <input type="file" id="tokenEditorAudio" accept="audio/*" />
+    </div>
+    <p id="tokenEditorError" class="token-editor-error" hidden></p>
+    <div class="token-editor-actions">
+      <button id="tokenEditorSave" type="button">儲存（存進自訂詞庫）</button>
+      <button id="tokenEditorCancel" type="button">取消</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn">▶ 播放語音</button>
+    <button id="stopBtn">■ 停止</button>
+    <button id="downloadBtn">⬇ 下載語音（WAV）</button>
+    <span class="speed-control">
+      <label for="speedSelect">語速</label>
+      <select id="speedSelect">
+        <option value="0.5">0.5×</option>
+        <option value="0.75">0.75×</option>
+        <option value="1" selected>1×（正常）</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="2">2×</option>
+      </select>
+    </span>
+  </div>
+  <p id="downloadStatus" class="download-status"></p>
+  <div id="manualLinks" class="manual-links" hidden>
+    <p>以下詞條使用萌典官方音檔，該伺服器不開放程式合併下載（非本工具的限制）。請個別點開連結，在新分頁用瀏覽器的「另存音訊」／右鍵「儲存音訊為」保存。若改用 <code>python serve.py</code> 開啟這個頁面（見說明），就能直接合併下載，不用逐個另存：</p>
+    <div id="manualLinksList"></div>
+  </div>
+
+  <div id="helpPanel" class="help-panel" hidden>
+    <h2>使用說明</h2>
+
+    <h3>三種寫法互相同步</h3>
+    <p>編輯全漢字、全羅、羅馬字加音調數字任一欄，另外兩欄會自動反推。<strong>沒有固定以哪個為主</strong>——頁面上方會顯示「目前以哪個欄位為準」；想改成以羅馬字為主，直接編輯全羅或數字調欄位即可，漢字會自動跟著配對過去。</p>
+
+    <h3>轉換錯了怎麼辦</h3>
+    <p>點擊解析結果列裡的任何一個詞，會打開修改面板：如果辭典本來就有多個讀音（例如破音字），會列成按鈕可以直接點選；也可以直接輸入正確的羅馬字（變音標或數字調都可以），甚至上傳這個詞自己的音檔。儲存後會存進「自訂詞庫」，疊加在官方辭典之上，下次打開頁面還在，語音也會跟著用你存的版本。</p>
+
+    <h3>辭典沒收錄的字</h3>
+    <p>辭典沒有的漢字，或是羅馬字沒對應到任何漢字，都會在解析結果列標示 ⚠ 警告。點擊一樣可以打開修改面板，自己補上讀音／漢字／音檔。</p>
+
+    <h3>播放語音</h3>
+    <p>依詞序接續播放教育部辭典的真人錄音（不是語音合成），可調整語速。串接播放沒有連續語流的連讀變調，逐字聽起來會比整句自然語音生硬一些，這是音檔本身（單字錄音）的性質，沒辦法完全消除，但詞與詞之間已依標點做了停頓節奏調整。</p>
+
+    <h3>下載語音（WAV）</h3>
+    <p>你自己上傳的音檔一定能合併下載；教育部官方辭典音檔的伺服器不開放跨網域讀取，單純雙擊 <code>index.html</code> 或用 <code>python -m http.server</code> 開啟時，遇到官方音檔會改列出個別連結供手動另存。想連官方音檔也一起合併下載，改用附的 <code>serve.py</code> 開啟（一樣需要 Python）：終端機執行 <code>python serve.py</code>，再開 <code>http://localhost:8791/index.html</code>——它會在本機幫忙讀取音檔再回傳給頁面，不經任何第三方伺服器。</p>
+
+    <h3>自訂詞庫格式</h3>
+    <p>CSV 或 JSON，UTF-8 編碼。CSV 需含表頭，欄位為「漢字,羅馬字,音檔,備註」（後兩欄可留空）；羅馬字可用全羅變音標或數字調任一種寫法，多音節詞用「-」連接。JSON 則為物件陣列，鍵名可用中文或英文：<code>{"漢字":"...","羅馬字":"...","音檔":"（選填）","備註":"（選填）"}</code>。範例檔：
+    <a href="custom-dictionary-example.csv" target="_blank" rel="noopener">custom-dictionary-example.csv</a>、
+    <a href="custom-dictionary-example.json" target="_blank" rel="noopener">custom-dictionary-example.json</a>。</p>
+
+    <h3>自己的錄音／音檔</h3>
+    <p>不需要架網站放檔案。「音檔」欄位可以直接寫檔名（例如 <code>a-ma.mp3</code>），再用「上傳自訂音檔」選取本機音檔（mp3／wav／ogg 皆可），系統會依檔名自動配對（區分大小寫、副檔名都要一致）；也可以填完整的 http(s) 網址。音檔存在瀏覽器本機（IndexedDB），不會上傳到任何伺服器。</p>
+
+    <h3>修改日誌</h3>
+    <ul id="changelogList">
+      <li><strong>2026-09-11（續 2）</strong>：加入 GitHub Pages 部署設定與說明。</li>
+      <li><strong>2026-09-11（續）</strong>：新增 <code>serve.py</code>（選用），讓「下載語音」也能合併官方辭典音檔，不經第三方伺服器。</li>
+      <li><strong>2026-09-11</strong>：新增點擊詞條即可修正讀音／補音檔（含辭典未收錄的警示與補登）；明亮／深色模式手動切換；語速調整；手機版面；播放節奏依標點停頓＋預先載入音檔。</li>
+      <li><strong>2026-09-10</strong>：初版：全漢字／全羅（教育部台羅／白話字）／數字調三向同步、播放教育部辭典真人錄音、多音字切換、自訂詞庫（CSV／JSON）、自訂音檔上傳、下載語音（WAV，含官方音檔 CORS 限制的個別連結備援）。</li>
+    </ul>
+    <p class="footnote">完整版本歷史見 <a href="README.md" target="_blank" rel="noopener">README.md</a>。</p>
+  </div>
+
+  <footer>
+    辭典資料來源：教育部《臺灣台語常用詞辭典》，經
+    <a href="https://github.com/g0v/moedict-data-twblg" target="_blank" rel="noopener">g0v/moedict-data-twblg</a>
+    （萌典）整理；語音為辭典真人錄音，並非語音合成。詳細使用說明請按右上角「❓ 說明」。
+  </footer>
+</main>
+
+<script src="romanize.js"></script>
+<script src="dict.js"></script>
+<script src="export.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

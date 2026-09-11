@@ -113,8 +113,13 @@ const Romanize = (() => {
   // { skeleton, tone } -> 白話字變音標
   function toPojMark(skeleton, tone) { return placeTone(skeletonToPoj(skeleton), tone); }
 
-  // { skeleton, tone } -> 台羅數字調（羅馬字加音調數字欄位固定用台羅骨架）
+  // { skeleton, tone } -> 台羅數字調
   function toNumeric(skeleton, tone) { return skeleton + tone; }
+
+  // { skeleton, tone } -> 白話字數字調。白話字的 o· 沒辦法用純 ASCII 表示，
+  // 這裡用組合字符的頂標點（跟 toPojMark 同一套），數字調照樣接在最後面，
+  // 兩者是不同 unicode 類別，不會互相干擾。
+  function toPojNumeric(skeleton, tone) { return skeletonToPoj(skeleton) + tone; }
 
   // 把一個「詞」（音節間用 - 連接）的原始字串，解析成 [{skeleton,tone}, ...]；
   // 若任何一個音節解析失敗回傳 null。
@@ -131,9 +136,13 @@ const Romanize = (() => {
   function wordToTailoMark(parsedSylls) { return parsedSylls.map(p => toTailoMark(p.skeleton, p.tone)).join('-'); }
   function wordToPojMark(parsedSylls) { return parsedSylls.map(p => toPojMark(p.skeleton, p.tone)).join('-'); }
   function wordToNumeric(parsedSylls) { return parsedSylls.map(p => toNumeric(p.skeleton, p.tone)).join('-'); }
+  function wordToPojNumeric(parsedSylls) { return parsedSylls.map(p => toPojNumeric(p.skeleton, p.tone)).join('-'); }
 
   // 台羅骨架調號 key，供辭典反查索引使用：例如 "tsiah8-png7"
   function wordToKey(parsedSylls) { return parsedSylls.map(p => p.skeleton + p.tone).join('-'); }
 
-  return { parse, parseWord, toTailoMark, toPojMark, toNumeric, wordToTailoMark, wordToPojMark, wordToNumeric, wordToKey };
+  return {
+    parse, parseWord, toTailoMark, toPojMark, toNumeric, toPojNumeric,
+    wordToTailoMark, wordToPojMark, wordToNumeric, wordToPojNumeric, wordToKey
+  };
 })();

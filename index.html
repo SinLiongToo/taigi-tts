@@ -12,6 +12,7 @@
     <div>
       <h1>台語文字轉語音</h1>
       <p class="subtitle">全漢字／全羅／羅馬字加調號數字，三種寫法互相同步；按「播放語音」播放教育部台語辭典真人錄音。</p>
+      <p class="version-info">版本 v1.4.0｜最後更新 2026-09-11（完整記錄見「❓ 說明」）</p>
     </div>
     <div class="top-row-actions">
       <button id="helpToggle" type="button" title="使用說明">❓ 說明</button>
@@ -61,7 +62,7 @@
   </div>
 
   <div class="field">
-    <label for="numericInput">羅馬字加音調數字</label>
+    <label id="numericLabel" for="numericInput">羅馬字加音調數字（教育部台羅）</label>
     <textarea id="numericInput" placeholder="例如：tsiah8-png7"></textarea>
   </div>
 
@@ -144,10 +145,11 @@
 
     <h3>修改日誌</h3>
     <ul id="changelogList">
-      <li><strong>2026-09-11（續 2）</strong>：加入 GitHub Pages 部署設定與說明。</li>
-      <li><strong>2026-09-11（續）</strong>：新增 <code>serve.py</code>（選用），讓「下載語音」也能合併官方辭典音檔，不經第三方伺服器。</li>
-      <li><strong>2026-09-11</strong>：新增點擊詞條即可修正讀音／補音檔（含辭典未收錄的警示與補登）；明亮／深色模式手動切換；語速調整；手機版面；播放節奏依標點停頓＋預先載入音檔。</li>
-      <li><strong>2026-09-10</strong>：初版：全漢字／全羅（教育部台羅／白話字）／數字調三向同步、播放教育部辭典真人錄音、多音字切換、自訂詞庫（CSV／JSON）、自訂音檔上傳、下載語音（WAV，含官方音檔 CORS 限制的個別連結備援）。</li>
+      <li><strong>v1.4.0 — 2026-09-11</strong>：修正切換全羅書寫系統時「羅馬字加音調數字」欄位沒有跟著變的問題；頁面上方加版本號與更新日期。</li>
+      <li><strong>v1.3.0 — 2026-09-11</strong>：加入 GitHub Pages 部署設定與說明。</li>
+      <li><strong>v1.2.0 — 2026-09-11</strong>：新增 <code>serve.py</code>（選用），讓「下載語音」也能合併官方辭典音檔，不經第三方伺服器。</li>
+      <li><strong>v1.1.0 — 2026-09-11</strong>：新增點擊詞條即可修正讀音／補音檔（含辭典未收錄的警示與補登）；明亮／深色模式手動切換；語速調整；手機版面；播放節奏依標點停頓＋預先載入音檔。</li>
+      <li><strong>v1.0.0 — 2026-09-10</strong>：初版：全漢字／全羅（教育部台羅／白話字）／數字調三向同步、播放教育部辭典真人錄音、多音字切換、自訂詞庫（CSV／JSON）、自訂音檔上傳、下載語音（WAV，含官方音檔 CORS 限制的個別連結備援）。</li>
     </ul>
     <p class="footnote">完整版本歷史見 <a href="README.md" target="_blank" rel="noopener">README.md</a>。</p>
   </div>

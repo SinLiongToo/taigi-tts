@@ -52,7 +52,8 @@ main { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; 
 
 .top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 h1 { font-size: 1.4rem; margin: 0 0 4px; }
-.subtitle { color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; }
+.subtitle { color: var(--muted); font-size: 0.9rem; margin: 0 0 4px; }
+.version-info { color: var(--muted); font-size: 0.75rem; margin: 0; opacity: 0.85; }
 
 .top-row-actions { display: flex; gap: 8px; flex: 0 0 auto; }
 #themeToggle, #helpToggle {

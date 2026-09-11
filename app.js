@@ -14,6 +14,7 @@
   const manualLinksList = el('manualLinksList');
   const schemeRadios = document.querySelectorAll('input[name="scheme"]');
   const tailoLabel = el('tailoLabel');
+  const numericLabel = el('numericLabel');
   const customFileInput = el('customFileInput');
   const customStatus = el('customStatus');
   const clearCustomBtn = el('clearCustomBtn');
@@ -154,7 +155,7 @@
       if (sourceKind === 'hanzi') {
         if (!token.entries.length) {
           return {
-            type: 'word', hanzi: token.hanzi, tailoMark: '', pojMark: '', numeric: '',
+            type: 'word', hanzi: token.hanzi, tailoMark: '', pojMark: '', numericTailo: '', numericPoj: '',
             audioUrl: null, reading: '', custom: false, alternatives: [], choice: 0,
             rawToken: token, unresolved: true, hanziKnown: true
           };
@@ -168,7 +169,8 @@
           hanzi: token.hanzi,
           tailoMark: Romanize.wordToTailoMark(parsedSylls),
           pojMark: Romanize.wordToPojMark(parsedSylls),
-          numeric: Romanize.wordToNumeric(parsedSylls),
+          numericTailo: Romanize.wordToNumeric(parsedSylls),
+          numericPoj: Romanize.wordToPojNumeric(parsedSylls),
           audioUrl: Dict.resolveAudioUrl(entry),
           reading: entry.reading,
           custom: !!entry.custom,
@@ -179,20 +181,21 @@
       }
 
       // sourceKind === 'rom'
-      const numeric = Romanize.wordToNumeric(token.parsedSylls);
+      const numericTailo = Romanize.wordToNumeric(token.parsedSylls);
+      const numericPoj = Romanize.wordToPojNumeric(token.parsedSylls);
       const tailoMark = Romanize.wordToTailoMark(token.parsedSylls);
       const pojMark = Romanize.wordToPojMark(token.parsedSylls);
       const matches = token.hanziMatches;
       if (matches && matches.length) {
         const m = matches[token.choice] || matches[0];
         return {
-          type: 'word', hanzi: m.hanzi, tailoMark, pojMark, numeric,
+          type: 'word', hanzi: m.hanzi, tailoMark, pojMark, numericTailo, numericPoj,
           audioUrl: Dict.resolveAudioUrl(m), reading: m.reading, custom: !!m.custom,
           alternatives: matches, choice: token.choice, rawToken: token
         };
       }
       return {
-        type: 'word', hanzi: `〔${numeric}〕`, tailoMark, pojMark, numeric,
+        type: 'word', hanzi: `〔${numericTailo}〕`, tailoMark, pojMark, numericTailo, numericPoj,
         audioUrl: null, reading: '', custom: false, alternatives: [], choice: 0, rawToken: token,
         unresolved: true, hanziKnown: false
       };
@@ -203,12 +206,13 @@
     const scheme = currentScheme();
     const hanziOut = tokens.map(t => t.type === 'word' ? t.hanzi : t.text).join('');
     const romKey = scheme === 'poj' ? 'pojMark' : 'tailoMark';
+    const numKey = scheme === 'poj' ? 'numericPoj' : 'numericTailo';
     const romOut = tokens
       .map(t => t.type === 'word' ? t[romKey] : t.text.trim())
       .filter(Boolean)
       .join(' ');
     const numOut = tokens
-      .map(t => t.type === 'word' ? t.numeric : t.text.trim())
+      .map(t => t.type === 'word' ? t[numKey] : t.text.trim())
       .filter(Boolean)
       .join(' ');
     return { hanziOut, romOut, numOut };
@@ -288,7 +292,7 @@
   function openTokenEditor(t, idx) {
     tokenEditorWarning.hidden = !t.unresolved;
     tokenEditorHanzi.value = (t.unresolved && t.hanziKnown === false) ? '' : t.hanzi;
-    tokenEditorTrs.value = t.numeric || '';
+    tokenEditorTrs.value = (currentScheme() === 'poj' ? t.numericPoj : t.numericTailo) || '';
     tokenEditorAudio.value = '';
     tokenEditorError.hidden = true;
     renderTokenEditorChoices(t);
@@ -363,7 +367,9 @@
   numericInput.addEventListener('input', onFieldInput('rom', numericInput));
 
   schemeRadios.forEach(r => r.addEventListener('change', () => {
-    tailoLabel.textContent = currentScheme() === 'poj' ? '全羅（白話字 POJ）' : '全羅（教育部台羅）';
+    const isPoj = currentScheme() === 'poj';
+    tailoLabel.textContent = isPoj ? '全羅（白話字 POJ）' : '全羅（教育部台羅）';
+    numericLabel.textContent = isPoj ? '羅馬字加音調數字（白話字）' : '羅馬字加音調數字（教育部台羅）';
     render();
   }));
 

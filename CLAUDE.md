@@ -81,6 +81,11 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   token，讓它在畫面上可點擊；`toCommonTokens` 對這種情況跟 rom 來源查無漢字的情況都會標
   `unresolved:true`。改動這段時，維持「一律存進 `custom` store、一律用 `addCustomEntry`」，
   不要另外做一條「僅這次生效、不存檔」的路徑，使用者是為了「改一次以後都對」才用這個功能的。
+- `segmentRomanization` 的 `ATTACHED_PUNCT_RE` 是踩過的坑：使用者貼文章進來時，標點常常
+  緊貼在字後面沒有空白（`chok-iong.`、`kò-chō,`），`Romanize.parse` 對這種字串會整個判定
+  失敗（因為結尾不是純字母），如果只靠空白切詞會讓整個詞連同標點一起變成無法轉換的文字。
+  這支正規式先把頭尾黏著的標點拆成獨立 token，才把中間的「詞本體」拿去解析——改動這段
+  斷詞邏輯時，記得用真實貼上的文章（不是乾淨的、詞與詞之間都有空白的範例）測一次。
 
 ## 測試方式
 

@@ -117,6 +117,12 @@
     return mergeLiterals(tokens);
   }
 
+  // 貼上來的文章常常標點直接黏在字後面（沒有空白），例如 "kò-chō,"、"chok-iong."。
+  // Romanize.parse 要求整個音節都是合法字母，黏著的標點會讓整個詞解析失敗、
+  // 整串原封不動當成文字——所以要先把頭尾黏著的標點拆成獨立的文字 token，
+  // 剩下的「詞本體」才拿去解析。
+  const ATTACHED_PUNCT_RE = /^([，。！？；：、,.!?;:'"()\[\]{}]*)([\s\S]*?)([，。！？；：、,.!?;:'"()\[\]{}]*)$/;
+
   // 羅馬字輸入（全羅或數字調皆可，Romanize.parse 會自動判斷）：以空白切詞、'-' 切音節。
   function segmentRomanization(text) {
     const parts = text.split(/(\s+)/);
@@ -124,15 +130,23 @@
     for (const part of parts) {
       if (part === '') continue;
       if (/^\s+$/.test(part)) { tokens.push({ type: 'literal', text: part }); continue; }
-      const sylls = part.split(/-+/);
-      const parsed = sylls.map(s => Romanize.parse(s));
-      if (parsed.length && parsed.every(Boolean)) {
-        const key = Romanize.wordToKey(parsed);
-        const matches = Dict.lookupRom(key);
-        tokens.push({ type: 'word', parsedSylls: parsed, hanziMatches: matches, choice: 0 });
-      } else {
-        tokens.push({ type: 'literal', text: part });
+
+      const [, lead, core, trail] = part.match(ATTACHED_PUNCT_RE);
+      if (lead) tokens.push({ type: 'literal', text: lead });
+
+      if (core) {
+        const sylls = core.split(/-+/);
+        const parsed = sylls.map(s => Romanize.parse(s));
+        if (parsed.length && parsed.every(Boolean)) {
+          const key = Romanize.wordToKey(parsed);
+          const matches = Dict.lookupRom(key);
+          tokens.push({ type: 'word', parsedSylls: parsed, hanziMatches: matches, choice: 0 });
+        } else {
+          tokens.push({ type: 'literal', text: core });
+        }
       }
+
+      if (trail) tokens.push({ type: 'literal', text: trail });
     }
     return mergeLiterals(tokens);
   }

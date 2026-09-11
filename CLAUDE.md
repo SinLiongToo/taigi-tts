@@ -43,7 +43,14 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
 - `romanize.js`：純函式，教育部台羅／白話字互轉＋變音標⇄數字調互轉。內部一律先正規化成
   「台羅骨架」（ASCII，`ts/tsh/oo/nn/ua/ue/ing/ik`），輸出時才轉成目標書寫系統。改動調號
   標示規則前，先看檔案開頭的優先順序註解（a > oo/o· > e > o > iu/ui > i > u > m > ng），
-  這是教育部台羅的官方規則，不是隨便訂的。
+  這是教育部台羅的官方規則，不是隨便訂的。同一支檔案的 `sandhiTone(skeleton, tone)` 是
+  連讀變調（本調→變調）的規則表，規則來源見 README「資料來源」。**這只是給
+  `app.js` 的「變調後」參考列用的顯示層計算，跟播放語音完全無關**——播放放的仍然是
+  `dict.js` 查到的固定本調音檔，沒有、也不打算即時變調播放（教育部辭典本身也只錄本調，
+  沒有變調音檔可用）。`app.js` 的 `computeSandhiSyllables()` 用「遇主要標點就斷句」當
+  變調組邊界，跨詞界連續變調（不是每個詞自己算一組）——這是刻意的簡化，沒有實作輕聲
+  （--）、疊字變調等特殊規則，不要因為某句話的參考結果跟語感有落差就當成 bug 硬改，
+  先確認是不是本來就沒涵蓋的特殊情況。
 - `dict.js`：官方辭典下載一次後存進 IndexedDB（db `taigi-tts-dict`，目前版本 3，三個
   object store：`cache` 官方索引、`custom` 使用者匯入的詞庫原始 rows、`audioBlobs` 使用者
   上傳的本機音檔）。**改資料庫結構要 bump 版本號並在 `onupgradeneeded` 用

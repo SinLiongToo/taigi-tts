@@ -102,6 +102,23 @@ const Romanize = (() => {
     return (letters.slice(0, insertAfter) + mark + letters.slice(insertAfter)).normalize('NFC');
   }
 
+  // 連讀變調（本調 -> 變調）規則表。標準循環 1→7→3→2→1，第5聲另外分支到7；
+  // 入聲（韻尾 p/t/k）4↔8 對調；喉塞韻尾 -h 的入聲則去掉 h 變成舒聲：4h→2、8h→3。
+  // 參考自使用者提供的台語羅馬字變調練習工具（教育部辭典錄音規則同源）。
+  // 只在「一個變調組裡、不是最後一個音節」時套用，呼叫端負責判斷分組與是否為組末。
+  const SANDHI_CYCLE = { 1: 7, 2: 1, 3: 2, 5: 7, 7: 3 };
+  function sandhiTone(skeleton, tone) {
+    if (tone === 4 || tone === 8) {
+      const last = skeleton.slice(-1).toLowerCase();
+      if (last === 'h') {
+        return { skeleton: skeleton.slice(0, -1), tone: tone === 4 ? 2 : 3 };
+      }
+      return { skeleton, tone: tone === 4 ? 8 : 4 };
+    }
+    const next = SANDHI_CYCLE[tone];
+    return { skeleton, tone: next !== undefined ? next : tone };
+  }
+
   // ---- 對外 API ----
 
   // 任意來源音節字串 -> { skeleton, tone }
@@ -142,7 +159,7 @@ const Romanize = (() => {
   function wordToKey(parsedSylls) { return parsedSylls.map(p => p.skeleton + p.tone).join('-'); }
 
   return {
-    parse, parseWord, toTailoMark, toPojMark, toNumeric, toPojNumeric,
+    parse, parseWord, toTailoMark, toPojMark, toNumeric, toPojNumeric, sandhiTone,
     wordToTailoMark, wordToPojMark, wordToNumeric, wordToPojNumeric, wordToKey
   };
 })();

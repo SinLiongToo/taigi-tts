@@ -4,6 +4,7 @@
   const tailoInput = el('tailoInput');
   const numericInput = el('numericInput');
   const detailRow = el('detailRow');
+  const sandhiRow = el('sandhiRow');
   const dictStatus = el('dictStatus');
   const reloadDictBtn = el('reloadDictBtn');
   const playBtn = el('playBtn');
@@ -171,6 +172,7 @@
           pojMark: Romanize.wordToPojMark(parsedSylls),
           numericTailo: Romanize.wordToNumeric(parsedSylls),
           numericPoj: Romanize.wordToPojNumeric(parsedSylls),
+          parsedSylls,
           audioUrl: Dict.resolveAudioUrl(entry),
           reading: entry.reading,
           custom: !!entry.custom,
@@ -190,12 +192,14 @@
         const m = matches[token.choice] || matches[0];
         return {
           type: 'word', hanzi: m.hanzi, tailoMark, pojMark, numericTailo, numericPoj,
+          parsedSylls: token.parsedSylls,
           audioUrl: Dict.resolveAudioUrl(m), reading: m.reading, custom: !!m.custom,
           alternatives: matches, choice: token.choice, rawToken: token
         };
       }
       return {
         type: 'word', hanzi: `〔${numericTailo}〕`, tailoMark, pojMark, numericTailo, numericPoj,
+        parsedSylls: token.parsedSylls,
         audioUrl: null, reading: '', custom: false, alternatives: [], choice: 0, rawToken: token,
         unresolved: true, hanziKnown: false
       };
@@ -218,6 +222,56 @@
     return { hanziOut, romOut, numOut };
   }
 
+  // ---------- 連讀變調（僅供參考顯示，不影響播放／其他欄位） ----------
+  //
+  // 變調組＝整句話裡被主要標點（，。！？；、,.!?;）隔開的一段；組內每個音節都變調，
+  // 只有整組最後一個音節維持本調——這個判斷跨詞界，不是每個詞自己算一組（符合真實連讀
+  // 變調的行為）。未解析的詞（顯示 〔數字調〕 占位）一樣有 parsedSylls，所以照樣能參與
+  // 變調計算；辭典完全查無讀音的漢字（沒有 parsedSylls）則略過，不勉強猜。
+
+  function computeSandhiSyllables(tokens) {
+    const groups = [];
+    let current = [];
+    tokens.forEach((t, tokenIdx) => {
+      if (t.type === 'word' && t.parsedSylls) {
+        t.parsedSylls.forEach((p, sylIdx) => current.push({ tokenIdx, sylIdx, skeleton: p.skeleton, tone: p.tone }));
+      } else if (t.type === 'literal' && /[，。！？；、,.!?;]/.test(t.text)) {
+        if (current.length) { groups.push(current); current = []; }
+      }
+    });
+    if (current.length) groups.push(current);
+
+    const result = new Map(); // "tokenIdx-sylIdx" -> { skeleton, tone }
+    groups.forEach(group => {
+      group.forEach((syl, i) => {
+        const isLast = i === group.length - 1;
+        const out = isLast ? { skeleton: syl.skeleton, tone: syl.tone } : Romanize.sandhiTone(syl.skeleton, syl.tone);
+        result.set(`${syl.tokenIdx}-${syl.sylIdx}`, out);
+      });
+    });
+    return result;
+  }
+
+  function buildSandhiOutput(tokens) {
+    const scheme = currentScheme();
+    const sandhiMap = computeSandhiSyllables(tokens);
+    const parts = [];
+    tokens.forEach((t, tokenIdx) => {
+      if (t.type === 'literal') {
+        const trimmed = t.text.trim();
+        if (trimmed) parts.push(trimmed);
+        return;
+      }
+      if (!t.parsedSylls) return; // 完全查無讀音，跳過不猜
+      const rendered = t.parsedSylls.map((p, sylIdx) => {
+        const s = sandhiMap.get(`${tokenIdx}-${sylIdx}`) || p;
+        return scheme === 'poj' ? Romanize.toPojMark(s.skeleton, s.tone) : Romanize.toTailoMark(s.skeleton, s.tone);
+      });
+      parts.push(rendered.join('-'));
+    });
+    return parts.join(' ');
+  }
+
   // ---------- 畫面更新 ----------
 
   function setIfNotFocused(input, value) {
@@ -237,6 +291,7 @@
     setIfNotFocused(tailoInput, romOut);
     setIfNotFocused(numericInput, numOut);
     updateSourceIndicator();
+    sandhiRow.textContent = buildSandhiOutput(commonTokens);
     renderDetail();
     updatePlayAvailability();
   }

@@ -113,6 +113,8 @@ h1 { font-size: 1.4rem; margin: 0 0 4px; }
 
 .detail-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
 .detail-panel label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+.sandhi-panel { border-style: dashed; }
+#sandhiRow { font-size: 1.1rem; line-height: 1.8; color: var(--muted); font-style: italic; word-break: break-all; }
 #detailRow { font-size: 1.3rem; line-height: 2.1; word-break: break-all; }
 .tok { padding: 0 1px; border-radius: 4px; cursor: pointer; }
 .tok.multi { border-bottom: 2px dotted var(--accent); }

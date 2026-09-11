@@ -18,7 +18,11 @@
   const numericLabel = el('numericLabel');
   const customFileInput = el('customFileInput');
   const customStatus = el('customStatus');
+  const viewCustomBtn = el('viewCustomBtn');
   const clearCustomBtn = el('clearCustomBtn');
+  const customViewer = el('customViewer');
+  const customViewerList = el('customViewerList');
+  const exportCustomBtn = el('exportCustomBtn');
   const audioFileInput = el('audioFileInput');
   const audioStatus = el('audioStatus');
   const clearAudioBtn = el('clearAudioBtn');
@@ -484,6 +488,7 @@
       updateCustomStatus();
       closeTokenEditor();
       refreshFromCurrentFields();
+      if (!customViewer.hidden) renderCustomViewer();
     } catch (err) {
       showEditorError('儲存失敗：' + err.message);
     } finally {
@@ -716,6 +721,8 @@
     const n = Dict.customCount();
     customStatus.textContent = n ? `已載入 ${n.toLocaleString()} 筆自訂詞條` : '尚未匯入自訂詞庫';
     clearCustomBtn.disabled = !n;
+    viewCustomBtn.disabled = !n;
+    if (!n) customViewer.hidden = true;
   }
 
   reloadDictBtn.addEventListener('click', () => initDict(true));
@@ -731,7 +738,9 @@
       if (result.errors.length) msg += `，${result.errors.length} 筆解析失敗：${result.errors.slice(0, 3).join('；')}${result.errors.length > 3 ? '…' : ''}`;
       customStatus.textContent = msg;
       clearCustomBtn.disabled = false;
+      viewCustomBtn.disabled = false;
       refreshFromCurrentFields();
+      if (!customViewer.hidden) renderCustomViewer();
     } catch (err) {
       customStatus.textContent = '匯入失敗：' + err.message;
     }
@@ -741,6 +750,88 @@
     await Dict.clearCustom();
     updateCustomStatus();
     refreshFromCurrentFields();
+  });
+
+  // ---------- 查看／管理自訂詞庫 ----------
+
+  async function renderCustomViewer() {
+    const rows = await Dict.getCustomEntries();
+    customViewerList.innerHTML = '';
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'custom-viewer-empty';
+      empty.textContent = '目前沒有自訂詞條。';
+      customViewerList.appendChild(empty);
+      return;
+    }
+    rows.forEach((row, idx) => {
+      const item = document.createElement('div');
+      item.className = 'custom-viewer-row';
+
+      const hanziEl = document.createElement('span');
+      hanziEl.className = 'cv-hanzi';
+      hanziEl.textContent = row.hanzi;
+
+      const trsEl = document.createElement('span');
+      trsEl.className = 'cv-trs';
+      trsEl.textContent = row.trs;
+
+      const audioEl = document.createElement('span');
+      audioEl.className = 'cv-audio';
+      const audioSrc = row.audio ? Dict.resolveAudioUrl({ audioUrl: row.audio }) : null;
+      if (audioSrc) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = audioSrc;
+        audioEl.appendChild(audio);
+      } else {
+        const span = document.createElement('span');
+        span.className = 'cv-noaudio';
+        span.textContent = row.audio ? '（找不到對應音檔）' : '（無音檔）';
+        audioEl.appendChild(span);
+      }
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'cv-delete';
+      delBtn.type = 'button';
+      delBtn.textContent = '刪除';
+      delBtn.addEventListener('click', async () => {
+        if (!confirm(`確定要刪除「${row.hanzi}」（${row.trs}）這筆自訂詞條？`)) return;
+        await Dict.removeCustomEntry(idx);
+        updateCustomStatus();
+        refreshFromCurrentFields();
+        renderCustomViewer();
+      });
+
+      item.append(hanziEl, trsEl, audioEl, delBtn);
+      customViewerList.appendChild(item);
+    });
+  }
+
+  viewCustomBtn.addEventListener('click', () => {
+    customViewer.hidden = !customViewer.hidden;
+    if (!customViewer.hidden) renderCustomViewer();
+  });
+
+  exportCustomBtn.addEventListener('click', async () => {
+    exportCustomBtn.disabled = true;
+    const originalText = exportCustomBtn.textContent;
+    exportCustomBtn.textContent = '匯出中…';
+    try {
+      const rows = await Dict.exportCustomWithAudio();
+      const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'custom-dictionary-export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      exportCustomBtn.disabled = false;
+      exportCustomBtn.textContent = originalText;
+    }
   });
 
   function updateAudioStatus() {
@@ -756,12 +847,14 @@
     audioFileInput.value = '';
     updateAudioStatus();
     refreshFromCurrentFields(); // 讓已經在畫面上、剛好對應到這些檔名的詞條重新解析出音檔
+    if (!customViewer.hidden) renderCustomViewer(); // 剛好補上某個自訂詞條缺的音檔時，畫面也要跟著更新
   });
 
   clearAudioBtn.addEventListener('click', async () => {
     await Dict.clearAudio();
     updateAudioStatus();
     refreshFromCurrentFields();
+    if (!customViewer.hidden) renderCustomViewer();
   });
 
   stopBtn.disabled = true;

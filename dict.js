@@ -309,6 +309,55 @@ const Dict = (() => {
     customCountMemo = 0;
   }
 
+  // 給「查看自訂詞庫」畫面用：回傳目前存的原始 rows（含各自在陣列中的 index，
+  // 刪除時要用這個 index 對應回 removeCustomEntry）。
+  async function getCustomEntries() {
+    return loadCustomRaw();
+  }
+
+  // 刪除單一自訂詞條：跟 clearCustom 一樣「重讀官方快取再套剩下的 rows」，
+  // 不要嘗試直接從 state.wordIndex/romIndex 挖掉那一筆——unshift 進去的資料
+  // 沒有保留是哪個 row 加的，直接挖容易挖錯或漏掉同一詞的其他 heteronym。
+  async function removeCustomEntry(index) {
+    const existing = await loadCustomRaw();
+    if (index < 0 || index >= existing.length) return;
+    const remaining = existing.slice(0, index).concat(existing.slice(index + 1));
+    await saveCustomRaw(remaining);
+    customCountMemo = remaining.length;
+    const cached = await readCache();
+    if (cached) state = { ...deserialize(cached), loaded: true };
+    if (remaining.length) applyCustomEntries(remaining);
+  }
+
+  function blobToDataURL(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('讀取音檔失敗'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // 匯出自訂詞庫，且把「使用者自己上傳的本機音檔」內嵌成 data: URL 一起存進同一個
+  // JSON 檔——這樣匯出的檔案本身就是完整備份，不用另外管理一堆音檔案，之後直接
+  // 用「匯入自訂詞庫」讀回來就好（importCustom/resolveAudioUrl 本來就支援 audio
+  // 欄位是 data: URL）。http(s) 網址型態的音檔照原樣保留，不用重新下載內嵌。
+  async function exportCustomWithAudio() {
+    const rows = await loadCustomRaw();
+    const out = [];
+    for (const row of rows) {
+      let audio = row.audio || '';
+      if (audio && !/^(https?:|data:|blob:)/i.test(audio)) {
+        const blob = await dbGet(AUDIO_STORE, audio);
+        if (blob) {
+          try { audio = await blobToDataURL(blob); } catch { /* 讀不到就照原檔名匯出，至少讀音資料不會丟 */ }
+        }
+      }
+      out.push({ hanzi: row.hanzi, trs: row.trs, audio, note: row.note || '' });
+    }
+    return out;
+  }
+
   // ---------- 自訂音檔：使用者上傳的本機錄音／音檔 ----------
   // 「音檔」欄位若是 http(s)/data 開頭當成網址；否則當成檔名，
   // 到這裡（使用者透過「上傳自訂音檔」選的檔案）比對是否有對應的檔案。
@@ -412,6 +461,7 @@ const Dict = (() => {
   return {
     load, lookupWord, lookupRom, getMaxWordLen, isLoaded, audioUrl, resolveAudioUrl,
     importCustom, clearCustom, customCount, addCustomEntry,
+    getCustomEntries, removeCustomEntry, exportCustomWithAudio,
     importAudioFiles, clearAudio, audioCount
   };
 })();

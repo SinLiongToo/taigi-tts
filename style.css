@@ -91,6 +91,32 @@ h1 { font-size: 1.4rem; margin: 0 0 4px; }
 }
 .status-bar button:disabled { opacity: 0.5; cursor: default; }
 
+.custom-viewer {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.custom-viewer-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.custom-viewer-actions button {
+  font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+  background: var(--accent); color: #fff; border: 1px solid var(--accent); white-space: nowrap;
+}
+.custom-viewer-hint { font-size: 0.78rem; color: var(--muted); }
+.custom-viewer-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.custom-viewer-row {
+  display: grid; grid-template-columns: minmax(60px, auto) 1fr auto auto;
+  align-items: center; gap: 10px; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem;
+}
+.custom-viewer-row .cv-hanzi { font-weight: 600; }
+.custom-viewer-row .cv-trs { color: var(--muted); }
+.custom-viewer-row audio { height: 28px; max-width: 160px; }
+.custom-viewer-row .cv-noaudio { color: var(--muted); font-size: 0.78rem; }
+.custom-viewer-row .cv-delete {
+  font-size: 0.78rem; padding: 3px 9px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: #c0392b; border: 1px solid #c0392b; white-space: nowrap;
+}
+.custom-viewer-empty { color: var(--muted); font-size: 0.85rem; padding: 4px 2px; }
+
 .scheme-toggle {
   display: flex; gap: 16px; align-items: center;
   font-size: 0.85rem; color: var(--muted);
@@ -193,6 +219,14 @@ footer a { color: var(--accent); }
   .status-bar { flex-wrap: wrap; gap: 8px; }
   .status-actions { margin-left: 0; width: 100%; flex-wrap: wrap; }
   .status-bar button, .status-bar .file-btn { flex: 1 1 auto; text-align: center; padding: 8px 10px; }
+
+  .custom-viewer-row {
+    grid-template-columns: 1fr auto; grid-template-areas: "hanzi delete" "trs trs" "audio audio";
+  }
+  .custom-viewer-row .cv-hanzi { grid-area: hanzi; }
+  .custom-viewer-row .cv-delete { grid-area: delete; }
+  .custom-viewer-row .cv-trs { grid-area: trs; }
+  .custom-viewer-row .cv-audio { grid-area: audio; }
 
   .scheme-toggle { flex-wrap: wrap; gap: 10px; }
 

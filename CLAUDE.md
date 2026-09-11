@@ -122,7 +122,18 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   不會自動撿到新增的詞。
 - 自訂詞庫用 `unshift` 插到辭典陣列最前面，讓自訂讀音變預設、但官方讀音還在陣列後面可以
   點擊切換——不要改成覆蓋／刪除官方資料，那樣 `clearCustom()`（靠重讀 `cache` store 復原）
-  就會失效。
+  就會失效。**`removeCustomEntry(index)`（「查看自訂詞庫」列表的單筆刪除）用的是同一套
+  「重讀官方快取、再把剩下的 rows 重新套一次 `applyCustomEntries`」模式，不要改成直接從
+  `state.wordIndex`/`state.romIndex` 挖掉那一筆**——`unshift` 進去的 entry 沒有保留是哪個
+  row 加的，直接挖容易挖錯、或漏掉同一漢字的其他 heteronym，「重讀再套一次」雖然多做一點
+  事，但保證跟 `clearCustom()` 一樣正確。「查看自訂詞庫」的匯出（`exportCustomWithAudio`）
+  刻意把本機音檔轉成 base64 `data:` URL 直接內嵌進匯出的 JSON，不是額外包一個 zip 或另外
+  匯出音檔案——這是因為 `resolveAudioUrl`／`applyCustomEntries` 本來就把 `audio` 欄位開頭是
+  `data:` 的字串當成可直接播放的網址處理，所以「匯出→（換瀏覽器／裝置）→匯入」這個備份
+  流程完全不需要新的匯入程式碼，直接用既有的「匯入自訂詞庫」就會把讀音跟音檔一起讀回來。
+  不要因為「檔案變大（base64 多佔 1/3）」就想著改成分開匯出音檔案，這個工具的自訂詞庫規模
+  （幾十到幾百筆）不會因為這樣有感的變慢，換來的是單一檔案就是完整備份，不用額外管理一堆
+  音檔案，這是刻意的取捨。
 - `app.js` 的 `toCommonTokens` / `render` 是同步的（設計選擇：早期版本考慮過把音檔解析
   做成 async，後來為了不讓整個渲染鏈變 async 而改成同步查 `audioMap`）；`Dict.resolveAudioUrl`
   因此也必須維持同步。

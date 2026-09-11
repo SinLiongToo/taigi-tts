@@ -121,6 +121,8 @@ h1 { font-size: 1.4rem; margin: 0 0 4px; }
 .tok.unresolved { color: var(--muted); border-bottom: 1px dashed #c0392b; }
 .tok.unresolved::before { content: '⚠'; font-size: 0.7em; vertical-align: super; margin-right: 1px; }
 .tok.custom { background: var(--accent-soft); }
+.tok.audio-fallback { border-bottom: 1px dotted #2980b9; }
+.tok.audio-fallback::after { content: '~'; font-size: 0.7em; vertical-align: super; margin-left: 1px; color: #2980b9; }
 .tok.playing { background: var(--accent-soft); }
 
 .token-editor {

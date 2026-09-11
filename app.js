@@ -252,9 +252,8 @@
     return result;
   }
 
-  function buildSandhiOutput(tokens) {
+  function buildSandhiOutput(tokens, sandhiMap) {
     const scheme = currentScheme();
-    const sandhiMap = computeSandhiSyllables(tokens);
     const parts = [];
     tokens.forEach((t, tokenIdx) => {
       if (t.type === 'literal') {
@@ -272,6 +271,27 @@
     return parts.join(' ');
   }
 
+  // 詞本身若已有音檔，優先用它（主）；沒有的話，用它在這句話裡「變調後」實際會讀的音，
+  // 反查辭典有沒有別的詞剛好本調就是這個讀音——找到的話借用那個詞的錄音當替代（副），
+  // 因為變調後的音，物理上就是那個聲音，跟是哪個詞沒有關係。查無讀音、只有〔數字調〕
+  // 占位的詞也適用，正是這個機制在解決的情境（辭典沒收錄、但變調後音接得上別的錄音）。
+  function applyAudioFallback(tokens, sandhiMap) {
+    tokens.forEach((t, tokenIdx) => {
+      if (t.type !== 'word' || t.audioUrl || !t.parsedSylls) return;
+      const sandhiSylls = t.parsedSylls.map((p, sylIdx) => sandhiMap.get(`${tokenIdx}-${sylIdx}`) || p);
+      const key = Romanize.wordToKey(sandhiSylls);
+      const matches = Dict.lookupRom(key);
+      if (!matches || !matches.length) return;
+      const m = matches[0];
+      const url = Dict.resolveAudioUrl(m);
+      if (url) {
+        t.audioUrl = url;
+        t.audioFallback = true;
+        t.audioFallbackFrom = m.hanzi;
+      }
+    });
+  }
+
   // ---------- 畫面更新 ----------
 
   function setIfNotFocused(input, value) {
@@ -286,12 +306,14 @@
 
   function render() {
     commonTokens = toCommonTokens(lastSeg.rawTokens, lastSeg.sourceKind);
+    const sandhiMap = computeSandhiSyllables(commonTokens);
+    applyAudioFallback(commonTokens, sandhiMap); // 詞本身若沒音檔，借用變調後同音字的錄音
     const { hanziOut, romOut, numOut } = buildOutputs(commonTokens);
     setIfNotFocused(hanziInput, hanziOut);
     setIfNotFocused(tailoInput, romOut);
     setIfNotFocused(numericInput, numOut);
     updateSourceIndicator();
-    sandhiRow.textContent = buildSandhiOutput(commonTokens);
+    sandhiRow.textContent = buildSandhiOutput(commonTokens, sandhiMap);
     renderDetail();
     updatePlayAvailability();
   }
@@ -305,12 +327,14 @@
         return;
       }
       const span = document.createElement('span');
-      span.className = 'tok' + (t.unresolved ? ' unresolved' : '') + (t.custom ? ' custom' : '') + (t.alternatives.length > 1 ? ' multi' : '');
+      span.className = 'tok' + (t.unresolved ? ' unresolved' : '') + (t.custom ? ' custom' : '') +
+        (t.alternatives.length > 1 ? ' multi' : '') + (t.audioFallback ? ' audio-fallback' : '');
       span.dataset.idx = String(idx);
       span.textContent = t.hanzi;
       span.title = t.unresolved
         ? '辭典未收錄，點擊補上讀音／音檔'
         : `讀音：${t.reading || '—'}｜${t.tailoMark}｜點擊修改讀音`;
+      if (t.audioFallback) span.title += `\n🔊 這個詞本身沒有音檔，播放的是變調後同音字「${t.audioFallbackFrom}」的錄音`;
       span.addEventListener('click', () => openTokenEditor(t, idx));
       detailRow.appendChild(span);
     });

@@ -135,9 +135,11 @@
       if (lead) tokens.push({ type: 'literal', text: lead });
 
       if (core) {
-        const sylls = core.split(/-+/);
-        const parsed = sylls.map(s => Romanize.parse(s));
-        if (parsed.length && parsed.every(Boolean)) {
+        // 用 Romanize.parseWord（不是自己土砲切 - 再逐個丟給 parse）才會保留
+        // 「--」輕聲標記；早期這裡手動 split(/-+/) 再逐音節 parse，會把 -- 跟
+        // 一般 - 混在一起處理掉，使用者自己打的輕聲標記就再也讀不回來了。
+        const parsed = Romanize.parseWord(core);
+        if (parsed) {
           const key = Romanize.wordToKey(parsed);
           const matches = Dict.lookupRom(key);
           tokens.push({ type: 'word', parsedSylls: parsed, hanziMatches: matches, choice: 0 });
@@ -242,13 +244,22 @@
   // 只有整組最後一個音節維持本調——這個判斷跨詞界，不是每個詞自己算一組（符合真實連讀
   // 變調的行為）。未解析的詞（顯示 〔數字調〕 占位）一樣有 parsedSylls，所以照樣能參與
   // 變調計算；辭典完全查無讀音的漢字（沒有 parsedSylls）則略過，不勉強猜。
+  //
+  // 兩個特殊規則優先於上面的一般規則：
+  // 1. 輕聲（--）：本身是輕聲、或後面緊接輕聲字的音節，維持本調不變調
+  //    （輕聲字本身也維持本調顯示，只是連接符號用 -- 標示，不是真的算出一個新調值）。
+  // 2. 三疊字（AAA，如「紅紅紅」）：連續三個本調完全相同、都不是輕聲的音節，
+  //    優先套用疊字專屬規則（見 romanize.js 的 sandhiTripleFirst），不管它們落在
+  //    變調組的哪個位置，這條規則都蓋過「組末維持本調」的一般規則。
 
   function computeSandhiSyllables(tokens) {
     const groups = [];
     let current = [];
     tokens.forEach((t, tokenIdx) => {
       if (t.type === 'word' && t.parsedSylls) {
-        t.parsedSylls.forEach((p, sylIdx) => current.push({ tokenIdx, sylIdx, skeleton: p.skeleton, tone: p.tone }));
+        t.parsedSylls.forEach((p, sylIdx) => current.push({
+          tokenIdx, sylIdx, skeleton: p.skeleton, tone: p.tone, neutral: !!p.neutral
+        }));
       } else if (t.type === 'literal' && /[，。！？；、,.!?;]/.test(t.text)) {
         if (current.length) { groups.push(current); current = []; }
       }
@@ -256,12 +267,29 @@
     if (current.length) groups.push(current);
 
     const result = new Map(); // "tokenIdx-sylIdx" -> { skeleton, tone }
+    const setResult = (syl, out) => result.set(`${syl.tokenIdx}-${syl.sylIdx}`, out);
+
     groups.forEach(group => {
-      group.forEach((syl, i) => {
-        const isLast = i === group.length - 1;
-        const out = isLast ? { skeleton: syl.skeleton, tone: syl.tone } : Romanize.sandhiTone(syl.skeleton, syl.tone);
-        result.set(`${syl.tokenIdx}-${syl.sylIdx}`, out);
-      });
+      let i = 0;
+      while (i < group.length) {
+        if (i + 2 < group.length &&
+            !group[i].neutral && !group[i + 1].neutral && !group[i + 2].neutral &&
+            group[i].skeleton === group[i + 1].skeleton && group[i].tone === group[i + 1].tone &&
+            group[i].skeleton === group[i + 2].skeleton && group[i].tone === group[i + 2].tone) {
+          setResult(group[i], Romanize.sandhiTripleFirst(group[i].skeleton, group[i].tone));
+          setResult(group[i + 1], Romanize.sandhiTone(group[i + 1].skeleton, group[i + 1].tone));
+          setResult(group[i + 2], { skeleton: group[i + 2].skeleton, tone: group[i + 2].tone });
+          i += 3;
+          continue;
+        }
+
+        const syl = group[i];
+        const isGroupFinal = i === group.length - 1;
+        const nextIsNeutral = (i + 1 < group.length) && group[i + 1].neutral;
+        const keepBase = isGroupFinal || syl.neutral || nextIsNeutral;
+        setResult(syl, keepBase ? { skeleton: syl.skeleton, tone: syl.tone } : Romanize.sandhiTone(syl.skeleton, syl.tone));
+        i += 1;
+      }
     });
     return result;
   }
@@ -276,12 +304,16 @@
         return;
       }
       if (!t.parsedSylls) return; // 完全查無讀音，跳過不猜
-      // 用數字調（不是變音標）顯示，方便直接跟上面「羅馬字加音調數字」欄位逐字比對哪個調變了。
-      const rendered = t.parsedSylls.map((p, sylIdx) => {
+      // 用數字調（不是變音標）顯示，方便直接跟上面「羅馬字加音調數字」欄位逐字比對哪個調變了；
+      // 輕聲音節前用 -- 連接（跟主欄位的呈現方式一致），不是普通的 -。
+      const sandhiSylls = t.parsedSylls.map((p, sylIdx) => {
         const s = sandhiMap.get(`${tokenIdx}-${sylIdx}`) || p;
-        return scheme === 'poj' ? Romanize.toPojNumeric(s.skeleton, s.tone) : Romanize.toNumeric(s.skeleton, s.tone);
+        return { skeleton: s.skeleton, tone: s.tone, neutral: p.neutral };
       });
-      parts.push(rendered.join('-'));
+      const form = scheme === 'poj'
+        ? Romanize.joinSylls(sandhiSylls, p => Romanize.toPojNumeric(p.skeleton, p.tone))
+        : Romanize.joinSylls(sandhiSylls, p => Romanize.toNumeric(p.skeleton, p.tone));
+      parts.push(form);
     });
     return parts.join(' ');
   }

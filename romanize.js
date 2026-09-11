@@ -119,6 +119,20 @@ const Romanize = (() => {
     return { skeleton, tone: next !== undefined ? next : tone };
   }
 
+  // 三疊字（AAA，例如「紅紅紅」加強語氣）第一字的特殊變調。本調 2/3/4 照一般
+  // 變調規則走；本調 1/5/7/8 變成「中升調」——教育部辭典沒有單獨錄這個調值
+  // 的音檔，慣例上用第5聲（本身也是升調，聽感最接近）的寫法代替，入聲8如果
+  // 是喉塞 -h 韻尾要一併去掉 h。呼叫端負責先偵測「連續三個本調完全相同」才用
+  // 這個函式，這裡本身不做偵測；第二、第三字分別用一般變調／維持本調即可，
+  // 不需要專門的函式。
+  function sandhiTripleFirst(skeleton, tone) {
+    if (tone === 2 || tone === 3 || tone === 4) return sandhiTone(skeleton, tone);
+    if (tone === 8 && skeleton.slice(-1).toLowerCase() === 'h') {
+      return { skeleton: skeleton.slice(0, -1), tone: 5 };
+    }
+    return { skeleton, tone: 5 };
+  }
+
   // ---- 對外 API ----
 
   // 任意來源音節字串 -> { skeleton, tone }
@@ -138,28 +152,50 @@ const Romanize = (() => {
   // 兩者是不同 unicode 類別，不會互相干擾。
   function toPojNumeric(skeleton, tone) { return skeletonToPoj(skeleton) + tone; }
 
-  // 把一個「詞」（音節間用 - 連接）的原始字串，解析成 [{skeleton,tone}, ...]；
-  // 若任何一個音節解析失敗回傳 null。
+  // 把一個「詞」（音節間用 - 連接）的原始字串，解析成 [{skeleton,tone,neutral}, ...]；
+  // 若任何一個音節解析失敗回傳 null。保留「--」跟一般「-」的差異：「--」表示
+  // 緊接在後面那個音節是輕聲（例如「食--的」「我--的」），輸出時要能原樣寫回去，
+  // 連讀變調時前一個音節也要因此維持本調，不能只當成普通的音節分隔符號吃掉。
   function parseWord(word) {
-    // 用一個以上的連字號切分音節，讓「--」輕聲標記寫法也能正常斷開
-    // （輕聲本身的變調不會被保留，只當作一般音節處理）。
-    const sylls = word.split(/-+/).filter(Boolean);
-    if (!sylls.length) return null;
-    const parsed = sylls.map(parseSyllable);
+    const parts = word.split(/(-+)/).filter(p => p !== '');
+    const raw = [];
+    let pendingNeutral = false;
+    for (const part of parts) {
+      if (/^-+$/.test(part)) { pendingNeutral = part.length >= 2; continue; }
+      raw.push({ text: part, neutral: pendingNeutral });
+      pendingNeutral = false;
+    }
+    if (!raw.length) return null;
+    const parsed = raw.map(r => {
+      const p = parseSyllable(r.text);
+      if (!p) return null;
+      p.neutral = r.neutral;
+      return p;
+    });
     if (parsed.some(p => !p)) return null;
     return parsed;
   }
 
-  function wordToTailoMark(parsedSylls) { return parsedSylls.map(p => toTailoMark(p.skeleton, p.tone)).join('-'); }
-  function wordToPojMark(parsedSylls) { return parsedSylls.map(p => toPojMark(p.skeleton, p.tone)).join('-'); }
-  function wordToNumeric(parsedSylls) { return parsedSylls.map(p => toNumeric(p.skeleton, p.tone)).join('-'); }
-  function wordToPojNumeric(parsedSylls) { return parsedSylls.map(p => toPojNumeric(p.skeleton, p.tone)).join('-'); }
+  // 依序組合音節成一個詞，音節前若標了 neutral 就用「--」連接，否則用一般「-」。
+  function joinSylls(parsedSylls, toForm) {
+    let out = toForm(parsedSylls[0]);
+    for (let i = 1; i < parsedSylls.length; i++) {
+      out += (parsedSylls[i].neutral ? '--' : '-') + toForm(parsedSylls[i]);
+    }
+    return out;
+  }
+
+  function wordToTailoMark(parsedSylls) { return joinSylls(parsedSylls, p => toTailoMark(p.skeleton, p.tone)); }
+  function wordToPojMark(parsedSylls) { return joinSylls(parsedSylls, p => toPojMark(p.skeleton, p.tone)); }
+  function wordToNumeric(parsedSylls) { return joinSylls(parsedSylls, p => toNumeric(p.skeleton, p.tone)); }
+  function wordToPojNumeric(parsedSylls) { return joinSylls(parsedSylls, p => toPojNumeric(p.skeleton, p.tone)); }
 
   // 台羅骨架調號 key，供辭典反查索引使用：例如 "tsiah8-png7"
   function wordToKey(parsedSylls) { return parsedSylls.map(p => p.skeleton + p.tone).join('-'); }
 
   return {
-    parse, parseWord, toTailoMark, toPojMark, toNumeric, toPojNumeric, sandhiTone,
+    parse, parseWord, toTailoMark, toPojMark, toNumeric, toPojNumeric,
+    sandhiTone, sandhiTripleFirst, joinSylls,
     wordToTailoMark, wordToPojMark, wordToNumeric, wordToPojNumeric, wordToKey
   };
 })();

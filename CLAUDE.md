@@ -44,10 +44,26 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   「台羅骨架」（ASCII，`ts/tsh/oo/nn/ua/ue/ing/ik`），輸出時才轉成目標書寫系統。改動調號
   標示規則前，先看檔案開頭的優先順序註解（a > oo/o· > e > o > iu/ui > i > u > m > ng），
   這是教育部台羅的官方規則，不是隨便訂的。同一支檔案的 `sandhiTone(skeleton, tone)` 是
-  連讀變調（本調→變調）的規則表，規則來源見 README「資料來源」。`app.js` 的
+  連讀變調（本調→變調）的規則表，`sandhiTripleFirst(skeleton, tone)` 是三疊字（AAA，
+  如「紅紅紅」）第一字的專屬規則——規則來源見 README「資料來源」。`app.js` 的
   `computeSandhiSyllables()` 用「遇主要標點就斷句」當變調組邊界，跨詞界連續變調（不是
-  每個詞自己算一組）——這是刻意的簡化，沒有實作輕聲（--）、疊字變調等特殊規則，不要因為
-  某句話的參考結果跟語感有落差就當成 bug 硬改，先確認是不是本來就沒涵蓋的特殊情況。
+  每個詞自己算一組），且優先偵測連續三個本調完全相同的音節套用三疊字規則、再處理輕聲
+  （`.neutral` 標記）、最後才是「組末維持本調」的一般規則——這個優先順序不要打亂。分組
+  仍然是「遇標點就斷句」的簡化版，沒有處理巢狀輕聲、超過三字的疊字這類更少見的情況，
+  不要因為某句話的參考結果跟語感有落差就當成 bug 硬改，先確認是不是本來就沒涵蓋的
+  特殊情況。
+  **`--` 跟一般 `-` 的差異一定要透過 `Romanize.parseWord()` 才會保留**（`--` 標記後面
+  那個音節是輕聲，`.neutral` 欄位）；`parse()`（單音節版本）不處理這個，只有
+  `parseWord()`（整詞版本）才會切開 `--`／`-` 並標記。踩過的坑：`app.js` 的
+  `segmentRomanization` 原本手動 `core.split(/-+/)` 再逐音節丟給 `Romanize.parse()`，
+  跳過了 `parseWord()`，導致使用者在羅馬字欄位直接打的 `--` 永遠不會被辨識成輕聲——
+  已經改成呼叫 `parseWord()`。**任何地方要把一串羅馬字文字切成音節陣列，一律呼叫
+  `Romanize.parseWord()`，不要自己重新 `split('-')` 再逐一 `parse()`**，不然一樣會
+  漏掉輕聲標記這個資訊。`wordToKey()` 刻意不管 `.neutral`（辭典反查用的 key 只看
+  骨架＋調號，輕聲不是不同的字），但 `wordToTailoMark()` / `wordToPojMark()` /
+  `wordToNumeric()` / `wordToPojNumeric()` 都透過共用的 `joinSylls()` 在輕聲音節前
+  輸出 `--`——新增任何組回一整個詞字串的地方，一樣要用 `joinSylls()`，不要自己
+  `.join('-')`。
   **重要：這套變調計算不只是給「變調後」參考列顯示用，`app.js` 的 `applyAudioFallback()`
   也拿它來決定播放的音檔**——詞本身若有音檔（`dict.js` 查到的本調錄音）一律優先用；
   只有詞本身沒音檔時，才用它在這句話裡的變調後讀音反查 `Dict.lookupRom()`，找剛好同音

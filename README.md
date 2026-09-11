@@ -26,7 +26,18 @@
 2. repo 設定 → Pages → Source 選「Deploy from a branch」→ 選 `main` 分支、`/ (root)` 資料夾 → Save。
 3. 幾分鐘後就能用 `https://<帳號>.github.io/<repo 名稱>/` 開啟。
 
-**注意**：GitHub Pages 是純靜態託管，不能跑 `serve.py`（那支腳本需要真的執行 Python）。所以透過 GitHub Pages 開啟時，「下載語音」遇到官方辭典音檔會維持「列出個別連結手動另存」的行為，跟單純雙擊 `index.html` 一樣；如果想要合併下載官方音檔，還是要把這個資料夾抓下來、在自己電腦上跑 `python serve.py`。其餘功能（三向同步、播放、自訂詞庫、自訂音檔、點擊修正）在 GitHub Pages 上完全不受影響。
+**注意**：GitHub Pages 是純靜態託管，不能跑 `serve.py`（那支腳本需要真的執行 Python）。所以透過 GitHub Pages 開啟時，「下載語音」遇到官方辭典音檔預設會維持「列出個別連結手動另存」的行為；想讓 Pages 上的版本也能一鍵合併下載，部署下面的 [cloudflare-worker.js](cloudflare-worker.js)（選用，免費）即可。其餘功能（三向同步、播放、自訂詞庫、自訂音檔、點擊修正）在 GitHub Pages 上完全不受影響。
+
+## 讓「下載語音」在 GitHub Pages 上也能合併官方音檔（選用）
+
+`serve.py` 只能在你自己電腦上跑；如果想讓掛在網路上的 Pages 版本也能一鍵合併下載官方辭典音檔，部署一個小小的 Cloudflare Worker 當「一直在線上」版的 proxy，原理跟 `serve.py` 一樣（伺服器對伺服器的請求不受瀏覽器 CORS 限制），只是換成一直開著、你自己控制的雲端帳號，而不是要你自己的電腦開著：
+
+1. 登入 [dash.cloudflare.com](https://dash.cloudflare.com)（沒有帳號免費註冊一個）
+2. Workers & Pages → Create → Create Worker，取個名字（例如 `taigi-tts-proxy`），Deploy
+3. 進去這個 Worker → Edit code，把 [cloudflare-worker.js](cloudflare-worker.js) 的內容整個貼進去覆蓋預設範例，按 Deploy
+4. 會拿到一個網址，像 `https://taigi-tts-proxy.<你的帳號>.workers.dev`；把它填進 [export.js](export.js) 最上面的 `EXTERNAL_PROXY_BASE` 常數，重新 push 到 GitHub 即可生效
+
+這一層只轉發固定格式的萌典音檔編號（不是任意網址的開放轉發站），音檔只會經過你自己控制的兩個地方（你的電腦／你的 Cloudflare 帳號），不會經過任何你不認識的第三方服務。不想用的話，把 `EXTERNAL_PROXY_BASE` 留空字串即可，行為就回到只有 `serve.py` 或個別連結那兩層。
 
 ## 功能
 
@@ -35,7 +46,7 @@
 - **辭典沒收錄會警示**：查不到的漢字，或羅馬字沒對應到任何漢字，會在解析結果列標示 ⚠，點擊一樣能直接補上讀音／漢字／音檔。
 - **播放語音**：依詞序接續播放教育部辭典的真人錄音（非語音合成）；會先預先載入下一個字的音檔，並依標點給不同停頓長度（詞間幾乎不停、逗號稍停、句號停更久），減少逐字唱名感——但連續語流的連讀變調無法還原，聽起來仍不會等同一句流暢口語，這是音檔來源（單字真人錄音）的性質限制。
 - **語速調整**：播放時可選 0.5×～2× 播放速度。
-- **下載語音（WAV）**：把目前這句的音檔合併成一個 WAV 檔下載。教育部辭典音檔伺服器未開放跨網域讀取（非本工具的限制，瀏覽器安全機制強制靜音），單純雙擊 `index.html` 或用 `python -m http.server` 開啟時，遇到官方音檔會改列出個別連結供手動另存；改用 `python serve.py` 開啟就能連官方音檔一起合併下載（原理見 [serve.py](serve.py) 開頭註解：由本機 Python 腳本代為讀取音檔、再以「跟網頁同源」的身份回傳給瀏覽器，繞過對方伺服器沒開 CORS 的限制，不經過任何第三方）。使用者自己上傳的音檔則不受此限制，一律能合併。
+- **下載語音（WAV）**：把目前這句的音檔合併成一個 WAV 檔下載。教育部辭典音檔伺服器未開放跨網域讀取（非本工具的限制，瀏覽器安全機制強制靜音），單純雙擊 `index.html` 或用 `python -m http.server` 開啟時，遇到官方音檔會改列出個別連結供手動另存；改用 `python serve.py` 開啟，或部署 [cloudflare-worker.js](cloudflare-worker.js)（本機／雲端各自獨立，可以只用一個、也可以兩個都設定，程式會依序自動嘗試），就能連官方音檔一起合併下載，不經過任何第三方服務。使用者自己上傳的音檔則不受此限制，一律能合併。
 - **自訂詞庫**：匯入 CSV 或 JSON 補充辭典沒有的詞（人名、地名、方言用字…），疊加在官方資料之上、可覆蓋預設讀音，原本官方讀音仍可點擊切換查看。格式與範例見 [custom-dictionary-example.csv](custom-dictionary-example.csv)／[custom-dictionary-example.json](custom-dictionary-example.json)，頁面下方 footer 也有說明。
 - **自訂音檔**：自訂詞庫的「音檔」欄位可以只填檔名，再用「上傳自訂音檔」選取本機錄音檔案，不需要架網站。音檔存在瀏覽器本機（IndexedDB），不會外傳。
 - **明亮／深色模式**：預設跟隨系統，右上角按鈕可手動切換並記住選擇。
@@ -54,6 +65,7 @@
 | `app.js` | 斷詞、畫面同步、播放、UI 事件綁定 |
 | `custom-dictionary-example.csv` / `.json` | 自訂詞庫格式範例 |
 | `serve.py` | 選用：本機靜態伺服器＋音檔 proxy，讓「下載語音」也能合併官方辭典音檔 |
+| `cloudflare-worker.js` | 選用：部署到自己 Cloudflare 帳號的雲端版音檔 proxy，效果跟 `serve.py` 一樣但不用開著電腦 |
 
 沒有建置流程、沒有外部 CDN 依賴，四支 `.js` 用一般 `<script>` 依序載入（`romanize.js` → `dict.js` → `export.js` → `app.js`）。
 
@@ -66,13 +78,15 @@
 
 - 辭典收錄約 14,500 個常用詞，罕用字詞、專有名詞可能查不到（可用自訂詞庫補充）。
 - 多音字（破音字）預設取辭典裡第一筆讀音，可點擊切換。
-- 官方辭典音檔伺服器沒有開放 CORS；單純開檔或用 `http.server` 時「下載語音」只能合併自訂音檔，官方音檔只能個別開新分頁另存——改用 `serve.py` 可以解除這個限制。
+- 官方辭典音檔伺服器沒有開放 CORS；單純開檔或用 `http.server` 時「下載語音」只能合併自訂音檔，官方音檔只能個別開新分頁另存——改用 `serve.py`（本機）或部署 `cloudflare-worker.js`（雲端，GitHub Pages 上也能用）可以解除這個限制。
 - 台羅／白話字自動轉換是規則式的（聲母、韻母、鼻化、調號標記規則），涵蓋常見組合；極罕見的韻母組合可能標錯調號位置。
 - 漢字斷詞是辭典比對式的「由長到短」貪婪演算法，非統計式斷詞，複合詞若不在辭典中會退回逐字比對。
 - 播放的是各自獨立錄製的單字音檔依序接續，沒有連續語流的連讀變調，聽感上不會等同一句流暢口語。
 
 ## 修改日誌
 
+- **v1.5.0 — 2026-09-11**
+  - 新增 `cloudflare-worker.js`（選用）：部署到自己的 Cloudflare 帳號，讓 GitHub Pages 上的版本也能一鍵合併下載官方辭典音檔，不需要本機開著 `serve.py`；`export.js` 依序嘗試直接讀取／本機 `serve.py`／這個雲端 proxy，兩種都設定也可以並存
 - **v1.4.0 — 2026-09-11**
   - 修正：切換全羅書寫系統（教育部台羅／白話字）時，「羅馬字加音調數字」欄位沒有跟著變成對應寫法的問題——現在兩欄會一起切換
   - 頁面上方加上版本號與最後更新日期

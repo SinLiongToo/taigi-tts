@@ -12,7 +12,7 @@
     <div>
       <h1>台語文字轉語音</h1>
       <p class="subtitle">全漢字／全羅／羅馬字加調號數字，三種寫法互相同步；按「播放語音」播放教育部台語辭典真人錄音。</p>
-      <p class="version-info">版本 v1.4.0｜最後更新 2026-09-11（完整記錄見「❓ 說明」）</p>
+      <p class="version-info">版本 v1.5.0｜最後更新 2026-09-11（完整記錄見「❓ 說明」）</p>
     </div>
     <div class="top-row-actions">
       <button id="helpToggle" type="button" title="使用說明">❓ 說明</button>
@@ -113,7 +113,7 @@
   </div>
   <p id="downloadStatus" class="download-status"></p>
   <div id="manualLinks" class="manual-links" hidden>
-    <p>以下詞條使用萌典官方音檔，該伺服器不開放程式合併下載（非本工具的限制）。請個別點開連結，在新分頁用瀏覽器的「另存音訊」／右鍵「儲存音訊為」保存。若改用 <code>python serve.py</code> 開啟這個頁面（見說明），就能直接合併下載，不用逐個另存：</p>
+    <p>以下詞條使用萌典官方音檔，該伺服器不開放程式合併下載（非本工具的限制）。請個別點開連結，在新分頁用瀏覽器的「另存音訊」／右鍵「儲存音訊為」保存。若改用 <code>python serve.py</code> 開啟這個頁面，或部署 <code>cloudflare-worker.js</code>（見「❓ 說明」），就能直接合併下載，不用逐個另存：</p>
     <div id="manualLinksList"></div>
   </div>
 
@@ -133,7 +133,12 @@
     <p>依詞序接續播放教育部辭典的真人錄音（不是語音合成），可調整語速。串接播放沒有連續語流的連讀變調，逐字聽起來會比整句自然語音生硬一些，這是音檔本身（單字錄音）的性質，沒辦法完全消除，但詞與詞之間已依標點做了停頓節奏調整。</p>
 
     <h3>下載語音（WAV）</h3>
-    <p>你自己上傳的音檔一定能合併下載；教育部官方辭典音檔的伺服器不開放跨網域讀取，單純雙擊 <code>index.html</code> 或用 <code>python -m http.server</code> 開啟時，遇到官方音檔會改列出個別連結供手動另存。想連官方音檔也一起合併下載，改用附的 <code>serve.py</code> 開啟（一樣需要 Python）：終端機執行 <code>python serve.py</code>，再開 <code>http://localhost:8791/index.html</code>——它會在本機幫忙讀取音檔再回傳給頁面，不經任何第三方伺服器。</p>
+    <p>你自己上傳的音檔一定能合併下載；教育部官方辭典音檔的伺服器不開放跨網域讀取，預設遇到官方音檔會改列出個別連結供手動另存。想連官方音檔也一起合併下載，有兩種選擇，可以只設一個、也可以兩個都設：</p>
+    <ul>
+      <li><strong>本機：</strong>改用附的 <code>serve.py</code> 開啟（需要 Python）：終端機執行 <code>python serve.py</code>，再開 <code>http://localhost:8791/index.html</code>。</li>
+      <li><strong>雲端（連 GitHub Pages 上也能用）：</strong>把 <code>cloudflare-worker.js</code> 部署到自己的 Cloudflare 帳號（免費），再把拿到的網址填進 <code>export.js</code> 的 <code>EXTERNAL_PROXY_BASE</code>。詳細步驟見 README「讓「下載語音」在 GitHub Pages 上也能合併官方音檔」。</li>
+    </ul>
+    <p>兩種原理相同：由你自己控制的電腦或雲端帳號代為讀取音檔、再回傳給頁面，不經任何你不認識的第三方伺服器。</p>
 
     <h3>自訂詞庫格式</h3>
     <p>CSV 或 JSON，UTF-8 編碼。CSV 需含表頭，欄位為「漢字,羅馬字,音檔,備註」（後兩欄可留空）；羅馬字可用全羅變音標或數字調任一種寫法，多音節詞用「-」連接。JSON 則為物件陣列，鍵名可用中文或英文：<code>{"漢字":"...","羅馬字":"...","音檔":"（選填）","備註":"（選填）"}</code>。範例檔：
@@ -145,6 +150,7 @@
 
     <h3>修改日誌</h3>
     <ul id="changelogList">
+      <li><strong>v1.5.0 — 2026-09-11</strong>：新增 <code>cloudflare-worker.js</code>（選用），讓 GitHub Pages 上的版本也能合併下載官方音檔，不用本機開著 <code>serve.py</code>。</li>
       <li><strong>v1.4.0 — 2026-09-11</strong>：修正切換全羅書寫系統時「羅馬字加音調數字」欄位沒有跟著變的問題；頁面上方加版本號與更新日期。</li>
       <li><strong>v1.3.0 — 2026-09-11</strong>：加入 GitHub Pages 部署設定與說明。</li>
       <li><strong>v1.2.0 — 2026-09-11</strong>：新增 <code>serve.py</code>（選用），讓「下載語音」也能合併官方辭典音檔，不經第三方伺服器。</li>

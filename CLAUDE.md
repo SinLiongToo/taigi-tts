@@ -11,9 +11,11 @@
 的用法，不要做。
 
 `serve.py` 只能在使用者自己電腦上跑（`python serve.py`），GitHub Pages 上沒有作用——
-Pages 不能執行 Python，`/proxy-audio/` 路徑在 Pages 上就是單純的 404。`export.js` 的
-`fetchAudioBytes` 已經處理好這個 fallback（proxy 抓不到就照舊丟錯，呼叫端改列個別連結），
-不需要因為「Pages 上這功能會退化」而特別做什麼，這是預期行為，README／`❓ 說明`都已經寫清楚。
+Pages 不能執行 Python，`/proxy-audio/` 路徑在 Pages 上就是單純的 404。為了讓部署在
+Pages 上的版本也能用，另外有 `cloudflare-worker.js`（選用、使用者自行部署到自己的
+Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 Worker 網址才會啟用
+第三層 fallback。三層都失敗（或該常數留空）就照舊丟錯，呼叫端改列個別連結——這是預期
+行為，不需要因為「這層退化了」而特別做什麼，README／`❓ 說明`都已經寫清楚。
 
 ## 硬性限制（不要違反）
 
@@ -26,14 +28,15 @@ Pages 不能執行 Python，`/proxy-audio/` 路徑在 Pages 上就是單純的 4
   音檔會走「個別連結另存」的備援路徑——維持這個行為，不要嘗試「修好」合併下載官方音檔。
 - **音檔網址一律 `<audio>` 元素播放，絕不用 `fetch()` 播放邏輯**（除非明確只處理
   已確認同源／CORS 開放的來源，例如 `export.js` 的合併下載）。
-- `serve.py` 是繞過上面那條 CORS 限制的**唯一**合法解法：本機 Python 腳本用
-  `urllib` 在「電腦」這一層抓音檔（不受瀏覽器 CORS 管），再以跟網頁同源的身份
-  （`/proxy-audio/<id>.mp3`）回傳給瀏覽器。`export.js` 的 `fetchAudioBytes` 會先試
-  直接 fetch、失敗才試這個路徑，兩者都失敗才 throw。**不要**改成串接任何第三方
-  CORS proxy（corsproxy.io 之類）當預設行為——使用者已經明確選過「只要本機方案」，
-  這是刻意的隱私/信任邊界，不是還沒做完。`serve.py` 的 `PROXY_PATH_RE` 只放行
-  `/proxy-audio/<1-6位數字>.mp3` 這個固定樣式，不要改成轉發任意網址，那樣會變成
-  開放中繼站。
+- 繞過上面那條 CORS 限制，只有兩種合法解法，`export.js` 的 `fetchAudioBytes` 依序
+  試：本機 `serve.py`（同源 `/proxy-audio/<id>.mp3`）、使用者自己部署的
+  `cloudflare-worker.js`（`EXTERNAL_PROXY_BASE` 指到的網址）。兩者都失敗才 throw。
+  **不要**改成串接任何「別人架的」公用 CORS proxy（corsproxy.io 之類）——這兩層都是
+  使用者自己控制的基礎設施（自己電腦、自己的 Cloudflare 帳號），音檔不會經過使用者
+  不認識的第三方，這是刻意的隱私／信任邊界，不是還沒做完；串進一個別人的公用 proxy
+  會打破這個邊界，不要做。`serve.py` 的 `PROXY_PATH_RE` 跟 `cloudflare-worker.js` 的
+  路徑判斷都只放行 `/audio/<1-6位數字>.mp3` 這個固定樣式，不要改成轉發任意網址，
+  那樣會變成開放中繼站。
 
 ## 資料流／架構重點
 

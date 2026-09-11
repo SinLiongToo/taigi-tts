@@ -499,7 +499,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 10000);
       downloadStatus.textContent = `已下載合併語音檔（WAV，共 ${seq.length} 個詞）`;
     } catch (err) {
-      downloadStatus.textContent = '無法自動合併下載：內容包含萌典官方辭典音檔，該伺服器不開放程式讀取（不是本工具的限制）。已在下方列出個別連結，請自行開啟後用瀏覽器另存；或改用 python serve.py 開啟本頁即可直接合併下載，見右上角「❓ 說明」。';
+      downloadStatus.textContent = '無法自動合併下載：內容包含萌典官方辭典音檔，該伺服器不開放程式讀取（不是本工具的限制）。已在下方列出個別連結，請自行開啟後用瀏覽器另存；或改用 python serve.py 開啟本頁，或部署 cloudflare-worker.js，即可直接合併下載，見右上角「❓ 說明」。';
       renderManualLinks(seq);
     } finally {
       downloadBtn.disabled = false;

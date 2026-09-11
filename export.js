@@ -18,7 +18,7 @@
 // 三層都不行才拋出錯誤，讓呼叫端改用「逐字另開分頁」的替代方案。
 const AudioExport = (() => {
   const MOEDICT_AUDIO_RE = /^https:\/\/r2-assets\.moedict\.tw\/audio\/t\/(\d+)\.mp3$/;
-  const EXTERNAL_PROXY_BASE = ''; // 部署 cloudflare-worker.js 後，把 https://xxx.workers.dev 填在這裡
+  const EXTERNAL_PROXY_BASE = 'https://taigi-tts-proxy.masahltu0322.workers.dev';
 
   async function tryFetch(url) {
     try {

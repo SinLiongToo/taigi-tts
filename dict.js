@@ -291,15 +291,41 @@ const Dict = (() => {
     return { added: rows.length, total: merged.length, errors };
   }
 
+  function wordKeyOf(trs) {
+    const p = Romanize.parseWord(trs);
+    return p ? Romanize.wordToKey(p) : null;
+  }
+
   // 單一詞條的即時修正／新增（畫面上點擊某個詞直接改讀音時用），
   // 邏輯與 importCustom 相同，只是入口是一筆 row 而不是整份檔案。
+  // 同一個漢字＋同一個實際讀音（用 wordKeyOf 比對，不看表面拼法——例如「soan1」
+  // 跟「suan1」拼法不同但骨架調號相同）已經存在時，視為「補上音檔／修正備註」，
+  // 直接取代那一筆，不要疊成兩筆重複的——不然使用者點同一個詞想補音檔，反而會在
+  // 自訂詞庫裡留一筆沒有音檔的舊資料在旁邊（「查看自訂詞庫」列表會看到重複兩筆）。
+  // 真的是不同讀音（破音字，key 不一樣）時才當成新增一筆，維持多讀音可以切換的功能。
   async function addCustomEntry(row) {
     const errors = applyCustomEntries([row]);
     if (errors.length) throw new Error(errors[0]);
+
     const existing = await loadCustomRaw();
-    const merged = existing.concat([row]);
+    const key = wordKeyOf(row.trs);
+    const idx = existing.findIndex(r => r.hanzi === row.hanzi &&
+      (r.trs === row.trs || (key && wordKeyOf(r.trs) === key)));
+    const merged = idx === -1
+      ? existing.concat([row])
+      : existing.slice(0, idx).concat([row], existing.slice(idx + 1));
+
     await saveCustomRaw(merged);
     customCountMemo = merged.length;
+
+    if (idx !== -1) {
+      // 取代情境：前面 applyCustomEntries([row]) 只有把新的一筆 unshift 進 state，
+      // 舊的那筆還留在 wordIndex/romIndex 裡——整個重讀官方快取再套一次完整清單，
+      // 才不會留下舊讀音的殘影。
+      const cached = await readCache();
+      if (cached) state = { ...deserialize(cached), loaded: true };
+      applyCustomEntries(merged);
+    }
   }
 
   async function clearCustom() {

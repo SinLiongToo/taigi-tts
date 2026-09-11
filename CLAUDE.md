@@ -143,6 +143,17 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   token，讓它在畫面上可點擊；`toCommonTokens` 對這種情況跟 rom 來源查無漢字的情況都會標
   `unresolved:true`。改動這段時，維持「一律存進 `custom` store、一律用 `addCustomEntry`」，
   不要另外做一條「僅這次生效、不存檔」的路徑，使用者是為了「改一次以後都對」才用這個功能的。
+  **`addCustomEntry` 會先用 `wordKeyOf`（骨架＋調號，不看表面拼法）比對「同一個漢字＋同一個
+  實際讀音」是否已經存在，存在就直接取代那一筆，不是單純 concat 新增。** 踩過的坑：使用者
+  點一個「已經存進自訂詞庫、但漏了音檔」的詞，重新打開編輯面板補上音檔存檔，原本行為是
+  多存一筆（舊的沒音檔那筆繼續留著），「查看自訂詞庫」列表因此會看到同一個詞重複兩筆，
+  一筆永遠沒音檔——不要改回單純 `concat`。判斷「同一個讀音」不能只比對 `trs` 字串是否相等：
+  同一個實際讀音可能因為使用者這次用了不同的拼寫系統（白話字 `soan1` vs 教育部台羅
+  `suan1`，骨架調號相同）而字串不同，一定要透過 `Romanize.parseWord` + `wordToKey` 正規化
+  後再比對。取代時記得整個重讀官方快取再套一次完整的 merged rows（跟 `removeCustomEntry`
+  同一套模式）——單純把新的 row `unshift` 進 state 不會把舊的那筆從 `wordIndex`/`romIndex`
+  裡拿掉。真正不同讀音（`wordKeyOf` 比對不同，例如破音字）要維持新增成獨立一筆，不能跟著
+  被取代，不然會壞掉「一個漢字可以有多個讀音、用 chips 切換」的功能。
 - `segmentRomanization` 的 `ATTACHED_PUNCT_RE` 是踩過的坑：使用者貼文章進來時，標點常常
   緊貼在字後面沒有空白（`chok-iong.`、`kò-chō,`），`Romanize.parse` 對這種字串會整個判定
   失敗（因為結尾不是純字母），如果只靠空白切詞會讓整個詞連同標點一起變成無法轉換的文字。

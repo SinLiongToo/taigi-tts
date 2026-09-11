@@ -276,9 +276,10 @@
         return;
       }
       if (!t.parsedSylls) return; // 完全查無讀音，跳過不猜
+      // 用數字調（不是變音標）顯示，方便直接跟上面「羅馬字加音調數字」欄位逐字比對哪個調變了。
       const rendered = t.parsedSylls.map((p, sylIdx) => {
         const s = sandhiMap.get(`${tokenIdx}-${sylIdx}`) || p;
-        return scheme === 'poj' ? Romanize.toPojMark(s.skeleton, s.tone) : Romanize.toTailoMark(s.skeleton, s.tone);
+        return scheme === 'poj' ? Romanize.toPojNumeric(s.skeleton, s.tone) : Romanize.toNumeric(s.skeleton, s.tone);
       });
       parts.push(rendered.join('-'));
     });
@@ -289,21 +290,47 @@
   // 反查辭典有沒有別的詞剛好本調就是這個讀音——找到的話借用那個詞的錄音當替代（副），
   // 因為變調後的音，物理上就是那個聲音，跟是哪個詞沒有關係。查無讀音、只有〔數字調〕
   // 占位的詞也適用，正是這個機制在解決的情境（辭典沒收錄、但變調後音接得上別的錄音）。
+  //
+  // 先試整個詞（所有音節合在一起）查，找到最準；多音節複合詞常常整個詞對不到，
+  // 這時改成一個音節一個音節分開查、各自借用同音字錄音接起來播（要全部音節都借得到
+  // 才用，不要播一半借到、一半沒聲音的破碎結果——那樣還不如老實顯示查無音檔）。
+  function findAudioMatch(sylls) {
+    const matches = Dict.lookupRom(Romanize.wordToKey(sylls));
+    const hit = matches && matches.find(m => Dict.resolveAudioUrl(m));
+    return hit ? { url: Dict.resolveAudioUrl(hit), hanzi: hit.hanzi } : null;
+  }
+
   function applyAudioFallback(tokens, sandhiMap) {
     tokens.forEach((t, tokenIdx) => {
       if (t.type !== 'word' || t.audioUrl || !t.parsedSylls) return;
       const sandhiSylls = t.parsedSylls.map((p, sylIdx) => sandhiMap.get(`${tokenIdx}-${sylIdx}`) || p);
-      const key = Romanize.wordToKey(sandhiSylls);
-      const matches = Dict.lookupRom(key);
-      if (!matches || !matches.length) return;
-      const m = matches[0];
-      const url = Dict.resolveAudioUrl(m);
-      if (url) {
-        t.audioUrl = url;
+
+      const whole = findAudioMatch(sandhiSylls);
+      if (whole) {
+        t.audioUrl = whole.url;
+        t.audioUrls = [whole.url];
         t.audioFallback = true;
-        t.audioFallbackFrom = m.hanzi;
+        t.audioFallbackMode = 'whole';
+        t.audioFallbackFrom = whole.hanzi;
+        return;
+      }
+
+      const perSyllable = sandhiSylls.map(s => findAudioMatch([s]));
+      if (perSyllable.every(Boolean)) {
+        t.audioUrls = perSyllable.map(p => p.url);
+        t.audioUrl = t.audioUrls[0];
+        t.audioFallback = true;
+        t.audioFallbackMode = 'syllable';
+        t.audioFallbackFrom = perSyllable.map(p => p.hanzi).join('、');
       }
     });
+  }
+
+  // 統一取得一個詞要播放／匯出的音檔清單：多音節借用時是好幾個 URL，其餘情況就是
+  // 自己那一個 URL 包成單一元素陣列；沒有音檔就是空陣列。
+  function tokenAudioUrls(t) {
+    if (t.audioUrls) return t.audioUrls;
+    return t.audioUrl ? [t.audioUrl] : [];
   }
 
   // ---------- 畫面更新 ----------
@@ -348,7 +375,11 @@
       span.title = t.unresolved
         ? '辭典未收錄，點擊補上讀音／音檔'
         : `讀音：${t.reading || '—'}｜${t.tailoMark}｜點擊修改讀音`;
-      if (t.audioFallback) span.title += `\n🔊 這個詞本身沒有音檔，播放的是變調後同音字「${t.audioFallbackFrom}」的錄音`;
+      if (t.audioFallback) {
+        span.title += t.audioFallbackMode === 'syllable'
+          ? `\n🔊 這個詞本身沒有音檔，逐音節借用變調後同音字「${t.audioFallbackFrom}」的錄音接起來播放`
+          : `\n🔊 這個詞本身沒有音檔，播放的是變調後同音詞「${t.audioFallbackFrom}」的錄音`;
+      }
       span.addEventListener('click', () => openTokenEditor(t, idx));
       detailRow.appendChild(span);
     });
@@ -492,8 +523,10 @@
         else if (/[，、,]/.test(t.text)) pendingGap = Math.max(pendingGap, GAP_CLAUSE_MS);
         return;
       }
-      if (t.type === 'word' && t.audioUrl) {
-        seq.push({ t, idx, gapBefore: seq.length ? (pendingGap || GAP_WORD_MS) : 0 });
+      if (t.type === 'word') {
+        const urls = tokenAudioUrls(t);
+        if (!urls.length) return;
+        seq.push({ t, idx, urls, gapBefore: seq.length ? (pendingGap || GAP_WORD_MS) : 0 });
         pendingGap = 0;
       }
     });
@@ -527,8 +560,9 @@
     stopBtn.disabled = false;
 
     // 全部預先建立、開始載入，這樣播到第 5、6 個字時它早就在背景載完了，
-    // 不會因為當下才去要求載入而卡一下。
-    const audios = seq.map(item => makeAudio(item.t.audioUrl));
+    // 不會因為當下才去要求載入而卡一下。一個詞可能是好幾段（分音節借用的情況），
+    // 所以每個項目對應一組 Audio，不是單一一個。
+    const audioGroups = seq.map(item => item.urls.map(makeAudio));
 
     for (let i = 0; i < seq.length; i++) {
       if (playState.abort) break;
@@ -538,7 +572,10 @@
 
       const span = detailRow.querySelector(`[data-idx="${idx}"]`);
       if (span) span.classList.add('playing');
-      await playOne(audios[i]);
+      for (const audio of audioGroups[i]) {
+        if (playState.abort) break;
+        await playOne(audio);
+      }
       if (span) span.classList.remove('playing');
     }
 
@@ -562,18 +599,21 @@
   function renderManualLinks(seq) {
     manualLinksList.innerHTML = '';
     seq.forEach(t => {
-      const a = document.createElement('a');
-      a.href = t.audioUrl;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = t.hanzi;
-      manualLinksList.appendChild(a);
+      const urls = tokenAudioUrls(t);
+      urls.forEach((url, i) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = urls.length > 1 ? `${t.hanzi}(${i + 1}/${urls.length})` : t.hanzi;
+        manualLinksList.appendChild(a);
+      });
     });
     manualLinks.hidden = false;
   }
 
   downloadBtn.addEventListener('click', async () => {
-    const seq = commonTokens.filter(t => t.type === 'word' && t.audioUrl);
+    const seq = commonTokens.filter(t => t.type === 'word' && tokenAudioUrls(t).length);
     if (!seq.length) return;
 
     downloadBtn.disabled = true;
@@ -581,7 +621,7 @@
     downloadStatus.textContent = '準備中…（讀取並合併音檔）';
 
     try {
-      const blob = await AudioExport.combineToWav(seq.map(t => t.audioUrl));
+      const blob = await AudioExport.combineToWav(seq.flatMap(tokenAudioUrls));
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

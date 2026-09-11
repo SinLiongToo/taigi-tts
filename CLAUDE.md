@@ -56,7 +56,14 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   即時變調合成這種東西，教育部辭典本身也只錄本調），差別只在於**挑選哪個錄音來用**這一
   步現在會考慮變調後的讀音。改這段時記得：主／副的優先順序（詞本身音檔 > 變調借用）不要
   反過來，也不要在詞本身已經有音檔時還去查變調借用（沒必要，也會讓 `audioFallback` 標記
-  失去意義）。
+  失去意義）。`applyAudioFallback()` 分兩層試：先把整個詞（所有音節）合在一起查一次
+  （`findAudioMatch(sandhiSylls)`），找到最準；查不到才逐音節分開各自查
+  （`sandhiSylls.map(s => findAudioMatch([s]))`），而且**要求每個音節都借得到才採用**——
+  不要改成「借到幾個算幾個」，播一半有聲音一半沒聲音的結果比老實顯示查無音檔更糟。逐音節
+  借用時一個詞會對應好幾個音檔，所以 `t.audioUrl` 只保留「第一段」給簡單的真假值判斷用
+  （`updatePlayAvailability` 之類)，實際要播放／匯出全部片段一律呼叫 `tokenAudioUrls(t)`
+  拿到完整陣列——新增任何消費 `t.audioUrl` 的地方，優先檢查是不是該改用
+  `tokenAudioUrls(t)`，不要只挑第一段就當作整個詞播完了。
 - `dict.js`：官方辭典下載一次後存進 IndexedDB（db `taigi-tts-dict`，目前版本 3，三個
   object store：`cache` 官方索引、`custom` 使用者匯入的詞庫原始 rows、`audioBlobs` 使用者
   上傳的本機音檔）。**改資料庫結構要 bump 版本號並在 `onupgradeneeded` 用

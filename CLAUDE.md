@@ -44,11 +44,18 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   「台羅骨架」（ASCII，`ts/tsh/oo/nn/ua/ue/ing/ik`），輸出時才轉成目標書寫系統。改動調號
   標示規則前，先看檔案開頭的優先順序註解（a > oo/o· > e > o > iu/ui > i > u > m > ng），
   這是教育部台羅的官方規則，不是隨便訂的。
-- `dict.js`：官方辭典（g0v/moedict-data-twblg 的 `dict-twblg.json`，約 7.7MB）下載一次後
-  存進 IndexedDB（db `taigi-tts-dict`，目前版本 3，三個 object store：`cache` 官方索引、
-  `custom` 使用者匯入的詞庫原始 rows、`audioBlobs` 使用者上傳的本機音檔）。**改資料庫結構
-  要 bump 版本號並在 `onupgradeneeded` 用 `objectStoreNames.contains` 檢查後再建立**，維持
-  對舊使用者既有資料非破壞性升級的寫法。
+- `dict.js`：官方辭典下載一次後存進 IndexedDB（db `taigi-tts-dict`，目前版本 3，三個
+  object store：`cache` 官方索引、`custom` 使用者匯入的詞庫原始 rows、`audioBlobs` 使用者
+  上傳的本機音檔）。**改資料庫結構要 bump 版本號並在 `onupgradeneeded` 用
+  `objectStoreNames.contains` 檢查後再建立**，維持對舊使用者既有資料非破壞性升級的寫法。
+  資料實際上是 g0v/moedict-data-twblg 的兩個檔案合併：`dict-twblg.json`（常用詞，約
+  7.7MB）+ `dict-twblg-ext.json`（補充詞，約 2.8MB），`fetchRaw()` 依序下載兩個再
+  `.concat()` 起來一起丟給 `buildIndex()`——這兩個檔案是同一個資料來源專案裡本來就存在
+  的兩份資料，不是額外找的第三方資料集，如果以後真的要再加別的資料源，要先確認格式
+  是否相容、有沒有清楚的授權，不要假設隨便一個 JSON 都能直接 concat 進來。**改動下載的
+  檔案組合（加減任何一份資料）要 bump `CACHE_KEY`**（目前 `dict-twblg-v2`），道理跟資料庫
+  結構升級一樣：不 bump 的話，已經快取過 v1 的舊使用者會永遠讀到舊的、缺資料的快取，
+  不會自動撿到新增的詞。
 - 自訂詞庫用 `unshift` 插到辭典陣列最前面，讓自訂讀音變預設、但官方讀音還在陣列後面可以
   點擊切換——不要改成覆蓋／刪除官方資料，那樣 `clearCustom()`（靠重讀 `cache` store 復原）
   就會失效。

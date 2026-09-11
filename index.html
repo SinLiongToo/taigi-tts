@@ -12,7 +12,7 @@
     <div>
       <h1>台語文字轉語音</h1>
       <p class="subtitle">全漢字／全羅／羅馬字加調號數字，三種寫法互相同步；按「播放語音」播放教育部台語辭典真人錄音。</p>
-      <p class="version-info">版本 v1.5.1｜最後更新 2026-09-11（完整記錄見「❓ 說明」）</p>
+      <p class="version-info">版本 v1.6.0｜最後更新 2026-09-11（完整記錄見「❓ 說明」）</p>
     </div>
     <div class="top-row-actions">
       <button id="helpToggle" type="button" title="使用說明">❓ 說明</button>
@@ -150,6 +150,7 @@
 
     <h3>修改日誌</h3>
     <ul id="changelogList">
+      <li><strong>v1.6.0 — 2026-09-11</strong>：併入萌典補充詞資料（<code>dict-twblg-ext.json</code>，約 6,800 筆，含真人錄音），辭典收錄從約 14,500 詞增加到約 20,600 詞，來源與版本細節見 README「資料來源」。</li>
       <li><strong>v1.5.1 — 2026-09-11</strong>：修正範例 CSV 用 Excel 雙擊開啟會變亂碼的問題（缺 UTF-8 BOM），並加上匯入自己 CSV 時的編碼提醒。</li>
       <li><strong>v1.5.0 — 2026-09-11</strong>：新增 <code>cloudflare-worker.js</code>（選用），讓 GitHub Pages 上的版本也能合併下載官方音檔，不用本機開著 <code>serve.py</code>。</li>
       <li><strong>v1.4.0 — 2026-09-11</strong>：修正切換全羅書寫系統時「羅馬字加音調數字」欄位沒有跟著變的問題；頁面上方加版本號與更新日期。</li>

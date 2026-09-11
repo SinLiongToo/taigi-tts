@@ -6,7 +6,7 @@
 
 直接用瀏覽器（建議 Chrome／Edge）開啟 [index.html](index.html) 即可，不需安裝、不需編譯。
 
-- 第一次使用會下載官方辭典資料（約 8MB），下載一次後會快取在瀏覽器（IndexedDB），之後可離線做羅馬字／漢字互轉。
+- 第一次使用會下載官方辭典資料（兩個檔案共約 10.5MB），下載一次後會快取在瀏覽器（IndexedDB），之後可離線做羅馬字／漢字互轉。
 - 若瀏覽器對 `file://` 直接開檔有較嚴格的限制（例如 fetch／IndexedDB 行為異常），可改用本機靜態伺服器開啟，例如：
   ```
   python -m http.server 8000
@@ -71,12 +71,17 @@
 
 ## 資料來源
 
-- 辭典資料：教育部《臺灣台語常用詞辭典》，經 [g0v/moedict-data-twblg](https://github.com/g0v/moedict-data-twblg)（萌典）整理為 JSON，格式轉換與整理部分以 CC0 釋出。
-- 語音：辭典本身附的真人錄音（`r2-assets.moedict.tw`），非語音合成。
+- **辭典原始資料**：教育部《臺灣台語常用詞辭典》(sutian.moe.edu.tw)。
+- **整理成 JSON 的版本**：[g0v/moedict-data-twblg](https://github.com/g0v/moedict-data-twblg)（萌典社群專案），格式轉換與整理部分以 CC0 釋出。本工具實際下載、合併的兩個檔案：
+  - 主檔案（常用詞，約 14,500 筆）：[dict-twblg.json](https://github.com/g0v/moedict-data-twblg/blob/master/dict-twblg.json)
+  - 附加檔案（補充詞，約 6,800 筆）：[dict-twblg-ext.json](https://github.com/g0v/moedict-data-twblg/blob/master/dict-twblg-ext.json)
+
+  兩份合併去重後目前約 20,600 個詞條，載入時由 `dict.js` 的 `fetchRaw()` 依序下載這兩個檔案並合併建索引，細節與快取版本號（cache-busting）邏輯見該檔案的註解。
+- **語音**：上述兩個 JSON 檔案裡各詞條附的真人錄音，實際音檔檔案託管在 `r2-assets.moedict.tw`（萌典專案自己的音檔伺服器），並非語音合成。
 
 ## 已知限制
 
-- 辭典收錄約 14,500 個常用詞，罕用字詞、專有名詞可能查不到（可用自訂詞庫補充）。
+- 辭典收錄約 20,600 個詞（常用詞＋補充詞兩個檔案合併），罕用字詞、專有名詞仍可能查不到（可用自訂詞庫補充）。
 - 多音字（破音字）預設取辭典裡第一筆讀音，可點擊切換。
 - 官方辭典音檔伺服器沒有開放 CORS；單純開檔或用 `http.server` 時「下載語音」只能合併自訂音檔，官方音檔只能個別開新分頁另存——改用 `serve.py`（本機）或部署 `cloudflare-worker.js`（雲端，GitHub Pages 上也能用）可以解除這個限制。
 - 台羅／白話字自動轉換是規則式的（聲母、韻母、鼻化、調號標記規則），涵蓋常見組合；極罕見的韻母組合可能標錯調號位置。
@@ -85,6 +90,8 @@
 
 ## 修改日誌
 
+- **v1.6.0 — 2026-09-11**
+  - 併入 [dict-twblg-ext.json](https://github.com/g0v/moedict-data-twblg/blob/master/dict-twblg-ext.json)（萌典補充詞資料，約 6,800 筆，同樣有真人錄音），跟原本的常用詞檔案合併，辭典收錄從約 14,500 詞增加到約 20,600 詞；辭典快取版本 bump（`dict-twblg-v2`），舊使用者會自動重新下載一次合併後的版本
 - **v1.5.1 — 2026-09-11**
   - 修正 `custom-dictionary-example.csv` 用 Excel 雙擊開啟會變亂碼的問題（原本缺 UTF-8 BOM，Excel 沒有 BOM 時會用系統預設編碼猜測，中文因此變亂碼；VS Code 等其他編輯器本來就沒有這個問題）；CSV 匯入邏輯也加了防禦性的 BOM 去除
   - 自訂詞庫說明加上「用 Excel 編輯要存成 CSV UTF-8」的提醒

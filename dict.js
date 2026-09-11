@@ -3,11 +3,12 @@
 // 另外支援使用者匯入自訂詞庫（CSV／JSON），疊加在官方資料之上。
 const Dict = (() => {
   const SOURCE_URL = 'https://raw.githubusercontent.com/g0v/moedict-data-twblg/master/dict-twblg.json';
+  const EXT_SOURCE_URL = 'https://raw.githubusercontent.com/g0v/moedict-data-twblg/master/dict-twblg-ext.json';
   const DB_NAME = 'taigi-tts-dict';
   const STORE = 'cache';
   const CUSTOM_STORE = 'custom';
   const AUDIO_STORE = 'audioBlobs';
-  const CACHE_KEY = 'dict-twblg-v1';
+  const CACHE_KEY = 'dict-twblg-v2'; // v2：併入 dict-twblg-ext.json，bump 版本讓已有 v1 快取的使用者重新下載
   const CUSTOM_KEY = 'rows';
 
   let state = { wordIndex: new Map(), romIndex: new Map(), maxWordLen: 1, loaded: false };
@@ -141,9 +142,9 @@ const Dict = (() => {
     };
   }
 
-  async function fetchRaw(onProgress) {
-    const res = await fetch(SOURCE_URL);
-    if (!res.ok) throw new Error('下載辭典失敗（HTTP ' + res.status + '）');
+  async function fetchOne(url, onProgress) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('下載辭典失敗（HTTP ' + res.status + '）：' + url);
     const total = parseInt(res.headers.get('content-length') || '0', 10);
     if (!res.body || !total) {
       const text = await res.text();
@@ -161,6 +162,15 @@ const Dict = (() => {
     }
     const text = await new Blob(chunks).text();
     return JSON.parse(text);
+  }
+
+  // 主檔案（常用詞，約 7.7MB）+ 附加檔案（補充詞，約 2.8MB）都下載、合併成一份陣列
+  // 再一起建索引。用固定權重讓單一進度條大致連續，不用真的先知道兩個檔案的精確位元組數。
+  async function fetchRaw(onProgress) {
+    const MAIN_WEIGHT = 0.73;
+    const main = await fetchOne(SOURCE_URL, p => onProgress && onProgress(p * MAIN_WEIGHT));
+    const ext = await fetchOne(EXT_SOURCE_URL, p => onProgress && onProgress(MAIN_WEIGHT + p * (1 - MAIN_WEIGHT)));
+    return main.concat(ext);
   }
 
   // ---------- 自訂詞庫：CSV／JSON 解析與套用 ----------

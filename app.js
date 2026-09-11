@@ -546,6 +546,10 @@
       playState.audio = audio;
       audio.addEventListener('ended', resolve, { once: true });
       audio.addEventListener('error', () => resolve(), { once: true }); // 單一音檔失敗不中斷整句
+      // 按「停止」是呼叫 audio.pause()，但 pause 本身不會觸發 ended／error——
+      // 不接這個事件的話，播放中途按停止，這個 Promise 會永遠卡住，導致整個
+      // playSequence 卡在 await、播放鍵/停止鍵永遠恢復不了。
+      audio.addEventListener('pause', resolve, { once: true });
       audio.play().catch(() => resolve());
     });
   }

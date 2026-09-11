@@ -64,6 +64,14 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   （`updatePlayAvailability` 之類)，實際要播放／匯出全部片段一律呼叫 `tokenAudioUrls(t)`
   拿到完整陣列——新增任何消費 `t.audioUrl` 的地方，優先檢查是不是該改用
   `tokenAudioUrls(t)`，不要只挑第一段就當作整個詞播完了。
+- **`playOne()` 一定要同時監聽 `pause` 事件，不能只等 `ended`／`error`。** 踩過的坑：
+  「停止」按鈕呼叫 `audio.pause()`，但 `pause()` 本身不會觸發 `ended` 或 `error`——如果
+  `playOne` 的 Promise 只等這兩個事件，播放中途按停止就會讓那個 `await` 永遠不 resolve，
+  整個 `playSequence` 卡住，`playState.playing` 永遠是 `true`，播放鍵和停止鍵永遠恢復
+  不了（已經實測驗證過：不接 `pause` 事件時，`.pause()` 後 2 秒內 Promise 完全沒有
+  resolve）。任何以後要改播放邏輯、或想用 `AbortController` 之類的東西重寫這段，都要
+  確認「使用者中途打斷播放」這條路徑真的會讓正在 `await` 的 Promise 走到底，不要只測
+  「播完整句」這種正常路徑。
 - `dict.js`：官方辭典下載一次後存進 IndexedDB（db `taigi-tts-dict`，目前版本 3，三個
   object store：`cache` 官方索引、`custom` 使用者匯入的詞庫原始 rows、`audioBlobs` 使用者
   上傳的本機音檔）。**改資料庫結構要 bump 版本號並在 `onupgradeneeded` 用

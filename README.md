@@ -130,6 +130,8 @@ flowchart LR
 
 ## 修改日誌
 
+- **v1.9.3 — 2026-09-12**
+  - 修正：播放語音時按「停止」，如果剛好打斷正在播放的音檔（不是打斷詞與詞之間的停頓），播放鍵和停止鍵會永遠恢復不了、整個播放功能卡死。原因是 `audio.pause()` 不會觸發 `ended`／`error` 事件，而播放邏輯只在等這兩個事件，導致整個 `await` 永遠不會繼續往下走。修法是多監聽 `pause` 事件。
 - **v1.9.2 — 2026-09-12**
   - 架構圖新增離線可看的 SVG 檔案（`docs/architecture-overview.svg`、`docs/architecture-download.svg`），不用連網、不用 Markdown 工具支援 Mermaid 也能開
 - **v1.9.1 — 2026-09-12**

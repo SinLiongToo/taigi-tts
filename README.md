@@ -71,6 +71,39 @@
 
 沒有建置流程、沒有外部 CDN 依賴，四支 `.js` 用一般 `<script>` 依序載入（`romanize.js` → `dict.js` → `export.js` → `app.js`）。
 
+## 架構圖
+
+**整體資料流：**
+
+```mermaid
+flowchart TD
+    MD["moedict-data-twblg<br/>dict-twblg.json + ext.json"] -->|首次下載一次| DICT
+    DICT["dict.js<br/>下載/合併/索引辭典"] <-->|快取，之後離線讀取| CACHE[("IndexedDB<br/>cache")]
+
+    CUSTOM["自訂詞庫 CSV/JSON<br/>＋ 上傳音檔"] --> CSTORE[("IndexedDB<br/>custom + audioBlobs")]
+    CSTORE --> DICT
+
+    UI(["三欄輸入：全漢字／全羅／數字調"]) <--> APP
+    APP["app.js<br/>斷詞、三欄同步、UI"] <--> DICT
+    APP <--> ROM["romanize.js<br/>台羅/白話字互轉、變調規則"]
+    APP --> OUT(["解析結果 + 變調後參考列"])
+    APP -->|播放語音| SPEAK[["🔊 audio 播放真人錄音"]]
+    APP -->|下載語音| EXP["export.js（見下圖：三層音檔來源）"]
+```
+
+**「下載語音」的三層音檔來源**（一般播放不受這三層影響，一律直接用 `<audio>` 播放）：
+
+```mermaid
+flowchart LR
+    EXP["export.js<br/>合併音檔成 WAV"] --> T1{"① 直接 fetch"}
+    T1 -->|成功：自己上傳的音檔／開放 CORS 的網址| WAV["WAV 下載"]
+    T1 -->|失敗：官方音檔沒開 CORS| T2{"② serve.py<br/>本機 proxy"}
+    T2 -->|成功：有在跑| WAV
+    T2 -->|沒在跑| T3{"③ Cloudflare Worker<br/>（選用，自架）"}
+    T3 -->|成功：有部署| WAV
+    T3 -->|沒設定| FAIL["改列個別連結<br/>手動另存"]
+```
+
 ## 資料來源
 
 - **辭典原始資料**：教育部《臺灣台語常用詞辭典》(sutian.moe.edu.tw)。
@@ -95,6 +128,9 @@
 
 ## 修改日誌
 
+- **v1.9.1 — 2026-09-12**
+  - 頁面上方的「最後更新」加上時分，不只日期
+  - 新增下方「架構圖」章節
 - **v1.9.0 — 2026-09-12**
   - 「變調後」列改用數字調顯示（不用變音標），方便跟「羅馬字加音調數字」欄位逐字對照
   - 借用同音字錄音的機制擴充：整個詞一起查找不到時（多音節複合詞常見），改成逐音節分開查、各自借用同音字錄音接起來播放（要每個音節都借得到才用）；播放序列與下載合併都同步支援一個詞對應多段音檔

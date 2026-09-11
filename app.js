@@ -258,7 +258,8 @@
     tokens.forEach((t, tokenIdx) => {
       if (t.type === 'word' && t.parsedSylls) {
         t.parsedSylls.forEach((p, sylIdx) => current.push({
-          tokenIdx, sylIdx, skeleton: p.skeleton, tone: p.tone, neutral: !!p.neutral
+          tokenIdx, sylIdx, skeleton: p.skeleton, tone: p.tone, neutral: !!p.neutral,
+          wordFinal: sylIdx === t.parsedSylls.length - 1
         }));
       } else if (t.type === 'literal' && /[，。！？；、,.!?;]/.test(t.text)) {
         if (current.length) { groups.push(current); current = []; }
@@ -284,9 +285,8 @@
         }
 
         const syl = group[i];
-        const isGroupFinal = i === group.length - 1;
-        const nextIsNeutral = (i + 1 < group.length) && group[i + 1].neutral;
-        const keepBase = isGroupFinal || syl.neutral || nextIsNeutral;
+        const nextIsNeutral = (i + 1 < group.length) && group[i + 1].neutral && group[i + 1].tokenIdx === syl.tokenIdx;
+        const keepBase = syl.wordFinal || syl.neutral || nextIsNeutral;
         setResult(syl, keepBase ? { skeleton: syl.skeleton, tone: syl.tone } : Romanize.sandhiTone(syl.skeleton, syl.tone));
         i += 1;
       }

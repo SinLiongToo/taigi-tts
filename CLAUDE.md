@@ -98,6 +98,16 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   resolve）。任何以後要改播放邏輯、或想用 `AbortController` 之類的東西重寫這段，都要
   確認「使用者中途打斷播放」這條路徑真的會讓正在 `await` 的 Promise 走到底，不要只測
   「播完整句」這種正常路徑。
+- **`style.css` 開頭有一條 `[hidden] { display: none !important; }`，不要拿掉。** 踩過的坑：
+  `.token-editor` 自己設了 `display: flex`（沒有 `!important`），跟瀏覽器內建的
+  `[hidden] { display: none }` UA 樣式比，author 樣式規則永遠贏過 UA 樣式規則（同樣是一般
+  優先度時，origin 排序在 specificity 之前，不是比誰的選擇器更精確），導致 `#tokenEditor`
+  設了 `hidden` 屬性、JS 也確實有設，但整塊編輯區塊從頁面一載入就 `display:flex`、實際
+  佔位顯示出來（已經用 Playwright 量過 `getComputedStyle().display` 跟 `offsetHeight`
+  實測驗證過）。任何以後新增的元件，只要會用 `display` 之類的 CSS 屬性去 style 一個會被
+  JS 切換 `hidden` 屬性／`.hidden = true/false` 的元素，都要注意這個陷阱——現在已經用
+  全站 `[hidden]` 規則統一擋掉，不要再對個別元素加 `display: none` 的例外處理，也不要因為
+  「這條規則好像沒用到」就刪掉它。
 - `dict.js`：官方辭典下載一次後存進 IndexedDB（db `taigi-tts-dict`，目前版本 3，三個
   object store：`cache` 官方索引、`custom` 使用者匯入的詞庫原始 rows、`audioBlobs` 使用者
   上傳的本機音檔）。**改資料庫結構要 bump 版本號並在 `onupgradeneeded` 用

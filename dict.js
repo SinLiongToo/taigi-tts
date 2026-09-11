@@ -263,6 +263,7 @@ const Dict = (() => {
   }
 
   async function importCustom(text, filename) {
+    text = text.replace(/^﻿/, ''); // 保險起見去掉 BOM（瀏覽器的 file.text() 其實已經會處理，這裡是雙重保險）
     const looksJSON = /\.json$/i.test(filename || '') || /^\s*[\[{]/.test(text);
     let rows;
     try {

@@ -47,7 +47,7 @@
 - **播放語音**：依詞序接續播放教育部辭典的真人錄音（非語音合成）；會先預先載入下一個字的音檔，並依標點給不同停頓長度（詞間幾乎不停、逗號稍停、句號停更久），減少逐字唱名感——但連續語流的連讀變調無法還原，聽起來仍不會等同一句流暢口語，這是音檔來源（單字真人錄音）的性質限制。
 - **語速調整**：播放時可選 0.5×～2× 播放速度。
 - **下載語音（WAV）**：把目前這句的音檔合併成一個 WAV 檔下載。教育部辭典音檔伺服器未開放跨網域讀取（非本工具的限制，瀏覽器安全機制強制靜音），單純雙擊 `index.html` 或用 `python -m http.server` 開啟時，遇到官方音檔會改列出個別連結供手動另存；改用 `python serve.py` 開啟，或部署 [cloudflare-worker.js](cloudflare-worker.js)（本機／雲端各自獨立，可以只用一個、也可以兩個都設定，程式會依序自動嘗試），就能連官方音檔一起合併下載，不經過任何第三方服務。使用者自己上傳的音檔則不受此限制，一律能合併。
-- **自訂詞庫**：匯入 CSV 或 JSON 補充辭典沒有的詞（人名、地名、方言用字…），疊加在官方資料之上、可覆蓋預設讀音，原本官方讀音仍可點擊切換查看。格式與範例見 [custom-dictionary-example.csv](custom-dictionary-example.csv)／[custom-dictionary-example.json](custom-dictionary-example.json)，頁面下方 footer 也有說明。
+- **自訂詞庫**：匯入 CSV 或 JSON 補充辭典沒有的詞（人名、地名、方言用字…），疊加在官方資料之上、可覆蓋預設讀音，原本官方讀音仍可點擊切換查看。格式與範例見 [custom-dictionary-example.csv](custom-dictionary-example.csv)／[custom-dictionary-example.json](custom-dictionary-example.json)，頁面下方 footer 也有說明。自己用 Excel 編輯 CSV 時記得存成「CSV UTF-8」，不要存一般「CSV」，不然用 Excel 直接雙擊開啟時中文會變亂碼（本工具匯入不受影響）。
 - **自訂音檔**：自訂詞庫的「音檔」欄位可以只填檔名，再用「上傳自訂音檔」選取本機錄音檔案，不需要架網站。音檔存在瀏覽器本機（IndexedDB），不會外傳。
 - **明亮／深色模式**：預設跟隨系統，右上角按鈕可手動切換並記住選擇。
 - **手機模式**：窄螢幕會自動改成單欄、可點擊區域加大的版面。
@@ -85,6 +85,9 @@
 
 ## 修改日誌
 
+- **v1.5.1 — 2026-09-11**
+  - 修正 `custom-dictionary-example.csv` 用 Excel 雙擊開啟會變亂碼的問題（原本缺 UTF-8 BOM，Excel 沒有 BOM 時會用系統預設編碼猜測，中文因此變亂碼；VS Code 等其他編輯器本來就沒有這個問題）；CSV 匯入邏輯也加了防禦性的 BOM 去除
+  - 自訂詞庫說明加上「用 Excel 編輯要存成 CSV UTF-8」的提醒
 - **v1.5.0 — 2026-09-11**
   - 新增 `cloudflare-worker.js`（選用）：部署到自己的 Cloudflare 帳號，讓 GitHub Pages 上的版本也能一鍵合併下載官方辭典音檔，不需要本機開著 `serve.py`；`export.js` 依序嘗試直接讀取／本機 `serve.py`／這個雲端 proxy，兩種都設定也可以並存
 - **v1.4.0 — 2026-09-11**

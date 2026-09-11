@@ -112,6 +112,14 @@ Playwright（透過 `npx playwright`，裝在系統暫存目錄而非專案裡�
 當地時間）查詢當下實際時間再填，不要用之前 commit 的舊時間、也不要瞎編——README 的
 修改日誌沿用只填日期即可（那邊是給人看版本歷史，不需要精確到分鐘）。只改內部程式碼／
 文件、使用者感受不到差異的，不必特地bump版本號。
+- README「架構圖」章節的兩個 Mermaid 圖，在 `docs/architecture-overview.svg` 和
+  `docs/architecture-download.svg` 各有一份預先渲染好的 SVG，讓不連網、或 Markdown
+  工具不支援 Mermaid 時也能直接看圖（這是使用者明確要求的，不要覺得「反正 GitHub 上看
+  得到」就把 SVG 刪掉）。**改動 README 裡的 Mermaid 原始碼後，一定要重新產生這兩個
+  SVG**，指令見 README「架構圖」章節開頭那段——用
+  `npx @mermaid-js/mermaid-cli -i <臨時檔>.mmd -o docs/<檔名>.svg -b white`（先把
+  README 裡的 mermaid 區塊內容存成暫存的 `.mmd` 檔再餵給它）。兩份 SVG 分別是
+  10 萬字元級跟 2 萬字元級的檔案，不要手動編輯，永遠用工具重新產生。
 
 ## 風格
 

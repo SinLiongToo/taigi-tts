@@ -73,6 +73,8 @@
 
 ## 架構圖
 
+以下用 GitHub 原生支援的 Mermaid 語法畫（線上開 README 時會自動變成互動式的圖）；同樣的圖也存成 SVG 檔案在 [docs/](docs) 資料夾，不需要連網、也不需要 Markdown 工具支援 Mermaid，直接用瀏覽器或任何看圖軟體開啟 SVG 檔就能看：[docs/architecture-overview.svg](docs/architecture-overview.svg)、[docs/architecture-download.svg](docs/architecture-download.svg)。改動下面的 Mermaid 原始碼後，記得也重新產生這兩個 SVG（`npx @mermaid-js/mermaid-cli -i <檔名>.mmd -o docs/<檔名>.svg -b white`），不然兩邊會不同步。
+
 **整體資料流：**
 
 ```mermaid
@@ -128,6 +130,8 @@ flowchart LR
 
 ## 修改日誌
 
+- **v1.9.2 — 2026-09-12**
+  - 架構圖新增離線可看的 SVG 檔案（`docs/architecture-overview.svg`、`docs/architecture-download.svg`），不用連網、不用 Markdown 工具支援 Mermaid 也能開
 - **v1.9.1 — 2026-09-12**
   - 頁面上方的「最後更新」加上時分，不只日期
   - 新增下方「架構圖」章節

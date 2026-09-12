@@ -170,6 +170,8 @@ h1 { font-size: 1.4rem; margin: 0 0 4px; }
   border: 1px solid var(--border); background: var(--bg); color: var(--text);
 }
 .token-editor-error { color: #c0392b; font-size: 0.82rem; margin: 0; }
+.token-editor-hint { font-size: 0.78rem; color: var(--muted); margin: 2px 0 0; }
+.token-editor-hint.ok { color: #2980b9; }
 .token-editor-actions { display: flex; gap: 10px; }
 .token-editor-actions button {
   font-size: 0.88rem; padding: 6px 14px; border-radius: 999px; cursor: pointer;

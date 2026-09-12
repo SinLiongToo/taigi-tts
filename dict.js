@@ -296,6 +296,18 @@ const Dict = (() => {
     return p ? Romanize.wordToKey(p) : null;
   }
 
+  // 編輯面板重新打開時，檔案選取欄位一律是空的（瀏覽器安全限制，沒辦法預填），
+  // 所以「這次沒選檔案」不代表「這個詞本來就沒有音檔」——重新編輯一個早就補過
+  // 真人錄音的詞（例如只是想順手修正漢字拼法）時，要能查到「原本已經有」的音檔
+  // 欄位值，保留下來，不要被空白覆蓋掉，也不要因此觸發自動合成把真錄音換成借
+  // 來的替代品。
+  async function findCustomAudio(hanzi, trs) {
+    const key = wordKeyOf(trs);
+    const rows = await loadCustomRaw();
+    const match = rows.find(r => r.hanzi === hanzi && (r.trs === trs || (key && wordKeyOf(r.trs) === key)));
+    return (match && match.audio) ? match.audio : null;
+  }
+
   // 單一詞條的即時修正／新增（畫面上點擊某個詞直接改讀音時用），
   // 邏輯與 importCustom 相同，只是入口是一筆 row 而不是整份檔案。
   // 同一個漢字＋同一個實際讀音（用 wordKeyOf 比對，不看表面拼法——例如「soan1」
@@ -487,7 +499,7 @@ const Dict = (() => {
   return {
     load, lookupWord, lookupRom, getMaxWordLen, isLoaded, audioUrl, resolveAudioUrl,
     importCustom, clearCustom, customCount, addCustomEntry,
-    getCustomEntries, removeCustomEntry, exportCustomWithAudio,
+    getCustomEntries, removeCustomEntry, exportCustomWithAudio, findCustomAudio,
     importAudioFiles, clearAudio, audioCount
   };
 })();

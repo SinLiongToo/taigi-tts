@@ -154,6 +154,23 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   同一套模式）——單純把新的 row `unshift` 進 state 不會把舊的那筆從 `wordIndex`/`romIndex`
   裡拿掉。真正不同讀音（`wordKeyOf` 比對不同，例如破音字）要維持新增成獨立一筆，不能跟著
   被取代，不然會壞掉「一個漢字可以有多個讀音、用 chips 切換」的功能。
+- **`tokenEditorSave` 存檔時若沒有選音檔案，會呼叫 `app.js` 的 `autoSynthesizeAudio(parsed)`
+  自動嘗試合成一個音檔，不是單純留空。** 作法：把這個詞當成獨立一個 word token 丟進
+  `computeSandhiSyllables` 算出它自己的變調（word-internal，跟畫面上單獨打這個詞會顯示的
+  「變調後」列一樣），再用跟 `applyAudioFallback` 相同的 `findAudioMatch`（先整詞查、查不到
+  才逐音節查、逐音節時要求每個音節都借得到）找候選音檔網址，找到就丟給
+  `AudioExport.combineToWav`（跟「下載語音」合併下載同一支函式，內部一樣會經過
+  `fetchAudioBytes` 的三層 CORS 繞過機制）合併成一個 WAV，再用 `Dict.importAudioFiles`
+  存成使用者自訂音檔（檔名 `auto-<timestamp>-<random>.wav`）。任何一步找不到或讀不到位元組
+  （沒有 serve.py／Cloudflare Worker）都要吞掉、回傳「沒有音檔」，不能讓存檔這個動作本身
+  失敗——讀音有沒有存到跟音檔合不合成得出來是兩件事，不要耦合在一起。**存檔前一定要先呼叫
+  `Dict.findCustomAudio(hanzi, trs)` 檢查這個詞是不是已經有音檔（自己上傳或先前自動合成
+  的都算）**，有的話直接沿用那個值，不要再嘗試合成或留空——`tokenEditorAudio` 這個
+  `<input type="file">` 出於瀏覽器安全限制，每次重新打開編輯面板一定是空的（沒辦法用 JS
+  預填某個檔案），所以「這次沒選檔案」絕對不能直接當成「這個詞沒有音檔」，不然使用者只是
+  想順手修正漢字拼法、重新存檔一次，就會把原本好好的真人錄音换成借來的替代品，甚至直接
+  清空——這是這個功能唯一容易踩到的坑，改這段時務必連著測「已經有音檔的詞，不選檔案、
+  改別的欄位重新存檔」這個情境，不能只測「全新的詞、沒有音檔」那一種。
 - `segmentRomanization` 的 `ATTACHED_PUNCT_RE` 是踩過的坑：使用者貼文章進來時，標點常常
   緊貼在字後面沒有空白（`chok-iong.`、`kò-chō,`），`Romanize.parse` 對這種字串會整個判定
   失敗（因為結尾不是純字母），如果只靠空白切詞會讓整個詞連同標點一起變成無法轉換的文字。

@@ -41,6 +41,7 @@
   const tokenEditorChoices = el('tokenEditorChoices');
   const tokenEditorTrs = el('tokenEditorTrs');
   const tokenEditorAudio = el('tokenEditorAudio');
+  const tokenEditorAudioHint = el('tokenEditorAudioHint');
   const tokenEditorError = el('tokenEditorError');
   const tokenEditorSave = el('tokenEditorSave');
   const tokenEditorCancel = el('tokenEditorCancel');
@@ -369,6 +370,46 @@
     return t.audioUrl ? [t.audioUrl] : [];
   }
 
+  // 使用者補登自訂詞條時若沒有自己上傳音檔，嘗試用「下載語音」合併下載同一套機制
+  // （AudioExport.combineToWav + 逐音節借用變調後同音字錄音）自動兜出一個音檔存
+  // 起來，讓這個詞不用真的錄音也有得播。跟畫面播放時的 audio-fallback 差別在於：
+  // 這裡是「存檔當下」就先合併成一個固定的 WAV 存進 audioBlobs，之後每次播放都是
+  // 直接用這個檔案，不用每次重算變調＋重新逐字借用；同時這個詞就算脫離目前這句
+  // 上下文（不同句子、不同前後字）也一樣有音檔可用。
+  // 找不到可借用的錄音，或合併時讀不到位元組（沒有 serve.py／Cloudflare Worker，
+  // 官方音檔的 CORS 限制擋下來）就回傳空字串，維持「留空、使用者可以之後自己補」
+  // 的原本行為，不當成阻擋存檔的錯誤。
+  async function autoSynthesizeAudio(parsed) {
+    const sandhiMap = computeSandhiSyllables([{ type: 'word', parsedSylls: parsed }]);
+    const sandhiSylls = parsed.map((p, i) => sandhiMap.get(`0-${i}`) || p);
+
+    let urls = null;
+    const whole = findAudioMatch(sandhiSylls);
+    if (whole) {
+      urls = [whole.url];
+    } else {
+      const perSyll = sandhiSylls.map(s => findAudioMatch([s]));
+      if (perSyll.every(Boolean)) urls = perSyll.map(p => p.url);
+    }
+    if (!urls) return { ok: false, reason: 'notfound' };
+
+    try {
+      // combineToWav 內部的 fetch 沒有逾時機制（瀏覽器預設不會自己斷線），網路狀況不好
+      // 或代理伺服器沒回應時可能一直卡著——存檔這個動作不能被這個「錦上添花」的自動合成
+      // 卡死，逾時就放棄，改成沒有音檔，使用者可以之後自己補。逾時後底下那個 fetch 可能
+      // 還在跑，就讓它自己跑完丟掉結果，不用特地取消，反正結果不會再被用到。
+      const TIMEOUT_MS = 10000;
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS));
+      const blob = await Promise.race([AudioExport.combineToWav(urls), timeout]);
+      const filename = `auto-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}.wav`;
+      const file = new File([blob], filename, { type: 'audio/wav' });
+      await Dict.importAudioFiles([file]);
+      return { ok: true, filename };
+    } catch (err) {
+      return { ok: false, reason: 'fetch', message: err.message };
+    }
+  }
+
   // ---------- 畫面更新 ----------
 
   function setIfNotFocused(input, value) {
@@ -454,6 +495,8 @@
     tokenEditorHanzi.value = (t.unresolved && t.hanziKnown === false) ? '' : t.hanzi;
     tokenEditorTrs.value = (currentScheme() === 'poj' ? t.numericPoj : t.numericTailo) || '';
     tokenEditorAudio.value = '';
+    tokenEditorAudioHint.hidden = true;
+    tokenEditorAudioHint.className = 'token-editor-hint';
     tokenEditorError.hidden = true;
     renderTokenEditorChoices(t);
     tokenEditor.hidden = false;
@@ -470,12 +513,15 @@
     const hanzi = tokenEditorHanzi.value.trim();
     const trs = tokenEditorTrs.value.trim();
     tokenEditorError.hidden = true;
+    tokenEditorAudioHint.hidden = true;
 
     if (!hanzi) return showEditorError('請填寫漢字（沒有對應漢字也可以自己取一個代表寫法）');
     if (!trs) return showEditorError('請填寫羅馬字或數字調讀音');
-    if (!Romanize.parseWord(trs)) return showEditorError('這個讀音格式看不懂，請確認拼法／調號（可用教育部台羅、白話字，或數字調）');
+    const parsed = Romanize.parseWord(trs);
+    if (!parsed) return showEditorError('這個讀音格式看不懂，請確認拼法／調號（可用教育部台羅、白話字，或數字調）');
 
     tokenEditorSave.disabled = true;
+    let synthOutcomeMsg = '';
     try {
       let audioFilename = '';
       const file = tokenEditorAudio.files[0];
@@ -483,18 +529,50 @@
         await Dict.importAudioFiles([file]);
         audioFilename = file.name;
         updateAudioStatus();
+      } else {
+        // 檔案選取欄位每次打開編輯面板都會是空的，「這次沒選檔案」不代表「這個詞
+        // 從來沒有音檔」——先看看同一個詞是不是早就補過音檔，有的話直接沿用，
+        // 不要因為這次忘記重新選檔案，就把已經存在的真人錄音換成自動合成的替代品。
+        const existingAudio = await Dict.findCustomAudio(hanzi, trs);
+        if (existingAudio) {
+          audioFilename = existingAudio;
+        } else {
+          tokenEditorAudioHint.hidden = false;
+          tokenEditorAudioHint.className = 'token-editor-hint';
+          tokenEditorAudioHint.textContent = '沒有選擇音檔，嘗試自動合成中…';
+          const synth = await autoSynthesizeAudio(parsed);
+          if (synth.ok) {
+            audioFilename = synth.filename;
+            updateAudioStatus();
+            synthOutcomeMsg = `已存檔「${hanzi}」（已借用同音字錄音自動合成音檔）`;
+          } else if (synth.reason === 'fetch') {
+            synthOutcomeMsg = `已存檔「${hanzi}」（找到可借用的錄音，但目前環境無法直接讀取音檔位元組，需要本機 serve.py 或已設定的 Cloudflare Worker，可之後再上傳）`;
+          } else {
+            synthOutcomeMsg = `已存檔「${hanzi}」（找不到可自動合成的音檔，可之後再上傳）`;
+          }
+        }
       }
       await Dict.addCustomEntry({ hanzi, trs, audio: audioFilename, note: '使用者修正' });
       updateCustomStatus();
       closeTokenEditor();
       refreshFromCurrentFields();
       if (!customViewer.hidden) renderCustomViewer();
+      if (synthOutcomeMsg) showTransientCustomStatus(synthOutcomeMsg);
     } catch (err) {
       showEditorError('儲存失敗：' + err.message);
     } finally {
       tokenEditorSave.disabled = false;
     }
   });
+
+  // 存檔後想順便交代「有沒有自動合成到音檔」，但 customStatus 平常顯示的是筆數統計，
+  // 暫時蓋過去幾秒再還原，不用另外開一塊固定佔位的提示區塊。
+  let transientStatusTimer = null;
+  function showTransientCustomStatus(msg) {
+    clearTimeout(transientStatusTimer);
+    customStatus.textContent = msg;
+    transientStatusTimer = setTimeout(updateCustomStatus, 5000);
+  }
 
   function updatePlayAvailability() {
     const hasAudio = commonTokens.some(t => t.type === 'word' && t.audioUrl);

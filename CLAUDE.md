@@ -180,6 +180,16 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   同一套模式）——單純把新的 row `unshift` 進 state 不會把舊的那筆從 `wordIndex`/`romIndex`
   裡拿掉。真正不同讀音（`wordKeyOf` 比對不同，例如破音字）要維持新增成獨立一筆，不能跟著
   被取代，不然會壞掉「一個漢字可以有多個讀音、用 chips 切換」的功能。
+  **`renderTokenEditorChoices` 畫破音字切換按鈕時，`alt.hanzi` 有值就一定要顯示出來，
+  不能只顯示 `讀音：trs`。** `t.alternatives` 有兩種來源，長得不一樣：`toCommonTokens`
+  的 hanzi 分支給的 `token.entries`（同一個漢字底下的破音字，例如食的白讀 tsia̍h／文讀
+  si̍t）沒有 `hanzi` 欄位，因為漢字欄位本身就已經顯示那個字，不用重複；但 rom 分支給的
+  `token.hanziMatches`（`Dict.lookupRom` 反查結果）每一筆都有 `hanzi` 欄位，因為同一個
+  羅馬字讀音本來就可能對到好幾個「同音但不同字」的候選（例如 tíng 同時是戥／等／頂／鼎）。
+  已經踩過的坑（使用者實測回報）：按鈕文字只顯示「讀音：trs」，這幾個不同字的候選因為
+  讀音剛好相同，按鈕文字會長得一模一樣（例如都寫「讀音：tíng」），使用者完全看不出來
+  要選的其實是不同的字，以為是重複選項。以後改這段時，判斷要不要顯示漢字看 `alt.hanzi`
+  是否存在就好，不要另外去猜是哪個分支來的。
 - **`tokenEditorSave` 存檔時若沒有選音檔案，會呼叫 `app.js` 的 `autoSynthesizeAudio(parsed)`
   自動嘗試合成一個音檔，不是單純留空。** 作法：把這個詞當成獨立一個 word token 丟進
   `computeSandhiSyllables` 算出它自己的變調（word-internal，跟畫面上單獨打這個詞會顯示的

@@ -533,7 +533,15 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'choice-chip' + (i === t.choice ? ' active' : '');
-      btn.textContent = `${alt.reading || '讀音'}：${alt.trs}`;
+      // alt.hanzi 只有「羅馬字反查到多個同音但不同字」的情況才有值（來源見
+      // toCommonTokens 的 rom 分支，token.hanziMatches 每筆都帶 hanzi）；同一個漢字
+      // 底下的破音字（entries）沒有這個欄位，因為漢字欄位本身已經顯示，不用重複。
+      // 有 alt.hanzi 時一定要顯示出來，不然使用者沒辦法分辨「共 3 個同音候選」哪個
+      // 對應哪個字——只看聲調類型＋羅馬字（例如都寫「讀音：ting2」）會看起來像重複
+      // 選項，但其實是完全不同的字。
+      btn.textContent = alt.hanzi
+        ? `${alt.hanzi}　${alt.reading || '讀音'}：${alt.trs}`
+        : `${alt.reading || '讀音'}：${alt.trs}`;
       btn.addEventListener('click', () => {
         t.rawToken.choice = i;
         closeTokenEditor();

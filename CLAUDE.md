@@ -74,6 +74,23 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   `wordToNumeric()` / `wordToPojNumeric()` 都透過共用的 `joinSylls()` 在輕聲音節前
   輸出 `--`——新增任何組回一整個詞字串的地方，一樣要用 `joinSylls()`，不要自己
   `.join('-')`。
+  **白話字的 `o͘`（U+0358 combining dot above right）／`ⁿ`（U+207F superscript n）這兩個
+  符號只能出現在「變音標」拼法（`toPojMark`／`wordToPojMark`），絕對不要讓「數字調」拼法
+  （`toPojNumeric`／`wordToPojNumeric`）也套用它們。** 已經踩過的坑（使用者實測回報）：
+  `o͘` 用的組合字元很多字型根本沒有對應字形，畫面上那個點常常直接看不見，讓「看護」
+  khan-hō͘ 轉出來的數字調看起來像少一個 o 的 `khan1-ho7`（骨架其實是對的 `hoo7`，只是那個
+  點沒被畫出來）；`ⁿ` 顯示雖然正常，但作為非 ASCII 字元，拿去做音檔檔名比對、或貼到
+  其他工具／文件比對時常常對不起來。數字調欄位存在的意義本來就是給人／程式方便輸入比對
+  用的純 ASCII 格式，混入這兩個 unicode 符號違反這個格式的初衷。因此 `romanize.js` 把
+  `skeletonToPoj(skeleton)` 拆成兩層：`skeletonToPojLetters(skeleton)`（只做聲母／韻母的
+  純 ASCII 替換：chh/ch/oa/oe/eng/ek，`oo`／`nn` 保持原樣不轉換）跟包著它、多套一層
+  `oo→o͘`／`nn→ⁿ` 替換的 `skeletonToPoj`。**`toPojNumeric` 一定要呼叫
+  `skeletonToPojLetters`，`toPojMark`（透過 `placeTone(skeletonToPoj(...))`）才呼叫
+  會套用 unicode 符號的 `skeletonToPoj`**——以後如果要新增任何「輸出數字調」的函式或路徑，
+  一律用前者；任何「輸出白話字正字法（給人看的變音標拼法）」的函式，才用後者。反過來，
+  `parseSyllable()`（把使用者打進來的白話字文字解析成骨架）本來就已經正確處理標準
+  Unicode 的 `o͘`／`ⁿ`（以及中點 `o·` 這個替代打法），這條規則只影響「輸出」方向，
+  不要為了這個修正去動 `parseSyllable` 的解析邏輯。
   **重要：這套變調計算不只是給「變調後」參考列顯示用，`app.js` 的 `applyAudioFallback()`
   也拿它來決定播放的音檔**——詞本身若有音檔（`dict.js` 查到的本調錄音）一律優先用；
   只有詞本身沒音檔時，才用它在這句話裡的變調後讀音反查 `Dict.lookupRom()`，找剛好同音

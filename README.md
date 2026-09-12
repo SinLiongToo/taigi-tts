@@ -143,6 +143,10 @@ flowchart LR
 
 ## 修改日誌
 
+- **v1.15.0 — 2026-09-12**
+  - 修正白話字（POJ）「羅馬字加音調數字」欄位混入 `o͘`（U+0358 combining dot above right）／`ⁿ`（U+207F superscript n）這兩個特殊 unicode 符號的問題：`romanize.js` 把 `skeletonToPoj()` 拆成 `skeletonToPojLetters()`（純 ASCII 的聲母／韻母替換：chh/ch/oa/oe/eng/ek，oo/nn 保持原樣）跟原本的 `skeletonToPoj()`（在 letters 之上再套 o͘／ⁿ），`toPojNumeric()` 改用前者
+  - 原因：`o͘` 用的組合字元很多字型沒有對應字形，畫面上那個點常常直接看不見，「看護」khan-hō͘ 轉出來的數字調看起來會像少一個 o 的 `khan1-ho7`（骨架其實沒錯，只是那個點沒被畫出來）；`ⁿ` 顯示雖然正常，但作為非 ASCII 字元，拿去做音檔檔名比對或貼到其他工具比對時常常對不起來——這是使用者實測回報的兩個症狀
+  - 白話字變音標欄位（顯示 `hō͘`／`piⁿ` 這種正字法）維持原樣不受影響，因為那裡本來就需要真正的白話字符號；只有數字調欄位改成一律純 ASCII 的 `oo`／`nn`（例如 `khan1-hoo7`、`pinn1`）
 - **v1.14.1 — 2026-09-12**
   - 修正自動合成音檔常常失敗的問題：`app.js` 新增 `findAudioCandidates()`（回傳「所有」同音候選，不只第一個）與 `findWorkingAudioUrl()`（依序實際試抓每個候選的位元組，抓不到就換下一個），`autoSynthesizeAudio()` 改用這兩個函式，不再是找到第一個「有音檔 id」的候選就直接用——教育部辭典資料裡不少字雖然列了音檔編號，實際上並沒有真的錄過單字音（「單字不成詞者不單獨錄音」，見「資料來源」），之前遇到這種情況會直接判定整個詞合成失敗
   - `export.js` 額外匯出 `fetchAudioBytes`，供上述候選試抓使用

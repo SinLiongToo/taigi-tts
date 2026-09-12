@@ -65,15 +65,28 @@ const Romanize = (() => {
     return orig[0] === orig[0].toUpperCase() ? repl[0].toUpperCase() + repl.slice(1) : repl;
   }
 
-  // 台羅骨架 -> 白話字骨架（保留 oo/nn，供最後一步轉換成 o·/ⁿ 前使用）。
-  function skeletonToPoj(skeleton) {
-    let s = skeleton
+  // 台羅骨架 -> 白話字聲母／韻母拼法，但 oo/nn 保持純 ASCII（不套用 o·／ⁿ）。
+  // 供數字調輸出使用：數字調欄位本來就是給人／程式方便輸入比對的格式，混入
+  // o͘／ⁿ 這種組合字元會有兩個實際問題——U+0358（combining dot above right）
+  // 很多字型根本沒有對應字形，畫面上會直接看不見，讓「hō͘」轉出來的數字調
+  // 看起來像缺一個 o 的「ho7」（其實骨架沒錯，只是那個點沒被畫出來）；
+  // ⁿ（U+207F）雖然顯示正常，但作為非 ASCII 字元會讓依賴數字調字串做音檔
+  // 檔名比對／外部工具比對的地方比對不到——這是使用者實測回報的兩個症狀，
+  // 不要再讓數字調欄位重新套用這兩個 unicode 符號。
+  function skeletonToPojLetters(skeleton) {
+    return skeleton
       .replace(/tsh/g, 'chh')
       .replace(/ts/g, 'ch')
       .replace(/ua/g, 'oa')
       .replace(/ue/g, 'oe')
       .replace(/ing$/, 'eng')
       .replace(/ik$/, 'ek');
+  }
+
+  // 台羅骨架 -> 白話字骨架，套上 o·／ⁿ（供變音標拼法 toPojMark 使用，那裡
+  // 顯示的是真正的白話字正字法，o͘／ⁿ 是必要、正確的符號，不受上面那條規則影響）。
+  function skeletonToPoj(skeleton) {
+    let s = skeletonToPojLetters(skeleton);
     s = s.replace(/oo/g, 'o' + DOT);
     s = s.replace(/nn$/, NASAL);
     return s;
@@ -147,10 +160,10 @@ const Romanize = (() => {
   // { skeleton, tone } -> 台羅數字調
   function toNumeric(skeleton, tone) { return skeleton + tone; }
 
-  // { skeleton, tone } -> 白話字數字調。白話字的 o· 沒辦法用純 ASCII 表示，
-  // 這裡用組合字符的頂標點（跟 toPojMark 同一套），數字調照樣接在最後面，
-  // 兩者是不同 unicode 類別，不會互相干擾。
-  function toPojNumeric(skeleton, tone) { return skeletonToPoj(skeleton) + tone; }
+  // { skeleton, tone } -> 白話字數字調。刻意用 skeletonToPojLetters（純 ASCII，
+  // oo/nn 保留原樣）而不是 skeletonToPoj——數字調欄位不套用 o͘／ⁿ 這兩個
+  // unicode 符號，原因見 skeletonToPojLetters 的註解。
+  function toPojNumeric(skeleton, tone) { return skeletonToPojLetters(skeleton) + tone; }
 
   // 把一個「詞」（音節間用 - 連接）的原始字串，解析成 [{skeleton,tone,neutral}, ...]；
   // 若任何一個音節解析失敗回傳 null。保留「--」跟一般「-」的差異：「--」表示

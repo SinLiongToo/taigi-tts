@@ -427,12 +427,24 @@
         // 可用。整詞都試過還是不行，才拆開逐音節各自試；逐音節一樣是每個音節各自把
         // 同音候選字試過一輪，全部都抓不到那個音節才整個詞放棄（不要播一半借到、一半
         // 沒聲音的破碎結果，跟 applyAudioFallback 的原則一致）。
-        const whole = await findWorkingAudioUrl(findAudioCandidates(sandhiSylls));
+        //
+        // 每一步（整詞／逐音節）都先試「變調後」的讀音，找不到候選才退而求其次試
+        // 「本調（原本的調）」讀音——原因：變調後的調值常常根本不是任何字的「本調」
+        // （例如「看」khàn 本調第3聲，變調後是第2聲，但教育部辭典裡沒有任何字本調
+        // 剛好是 khan2，因為 khan2 本來就不是一個會被單獨錄音的本調），這種情況下
+        // 逐音節找變調候選會直接找不到任何候選（不是「有候選但抓不到」，是根本沒有
+        // 候選字可試），若只試變調後讀音就整個詞放棄，會讓很多合法複合詞（各自的字
+        // 都有本調錄音，只是教育部沒收錄這個詞本身）也無法自動合成。退而求其次用本調
+        // 錄音接起來，雖然聽感上不是真正的連續變調，但比完全沒有音檔好，且這正是
+        // 教育部辭典本身「只錄本調」這個既有限制下能做到的最佳結果。
+        const whole = (await findWorkingAudioUrl(findAudioCandidates(sandhiSylls)))
+          || (await findWorkingAudioUrl(findAudioCandidates(parsed)));
         if (whole) return { urls: [whole.url] };
 
         const perSyll = [];
-        for (const s of sandhiSylls) {
-          const hit = await findWorkingAudioUrl(findAudioCandidates([s]));
+        for (let i = 0; i < sandhiSylls.length; i++) {
+          const hit = (await findWorkingAudioUrl(findAudioCandidates([sandhiSylls[i]])))
+            || (await findWorkingAudioUrl(findAudioCandidates([parsed[i]])));
           if (!hit) return null;
           perSyll.push(hit);
         }

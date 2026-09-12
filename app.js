@@ -337,6 +337,33 @@
     return hit ? { url: Dict.resolveAudioUrl(hit), hanzi: hit.hanzi } : null;
   }
 
+  // 跟 findAudioMatch 差在回傳「所有」候選（不是只挑第一個）——自動合成音檔時要用，
+  // 因為辭典資料裡列了 id 不代表教育部真的錄過那個字（「單字不成詞者不單獨錄音」，
+  // 見 README「資料來源」），第一個候選的位元組可能根本抓不到，這時要能換下一個
+  // 同音候選字繼續試，不是直接放棄整個詞。畫面即時播放（applyAudioFallback）維持
+  // 用 findAudioMatch 只挑第一個，因為那條路徑是同步的，沒辦法先逐一實際抓抓看
+  // 位元組才決定要不要用（那牽涉真的發 fetch，跟整個 render 鏈同步的設計衝突）。
+  function findAudioCandidates(sylls) {
+    const matches = Dict.lookupRom(Romanize.wordToKey(sylls));
+    if (!matches) return [];
+    return matches
+      .map(m => ({ url: Dict.resolveAudioUrl(m), hanzi: m.hanzi }))
+      .filter(c => c.url);
+  }
+
+  // 依序試 candidates，回傳第一個「位元組真的抓得到」的候選；每一個都抓不到才回傳 null。
+  async function findWorkingAudioUrl(candidates) {
+    for (const c of candidates) {
+      try {
+        await AudioExport.fetchAudioBytes(c.url);
+        return c;
+      } catch {
+        // 這個候選字的音檔實際上不存在（辭典資料有 id 但教育部沒錄），試下一個
+      }
+    }
+    return null;
+  }
+
   function applyAudioFallback(tokens, sandhiMap) {
     tokens.forEach((t, tokenIdx) => {
       if (t.type !== 'word' || t.audioUrl || !t.parsedSylls) return;
@@ -383,24 +410,38 @@
     const sandhiMap = computeSandhiSyllables([{ type: 'word', parsedSylls: parsed }]);
     const sandhiSylls = parsed.map((p, i) => sandhiMap.get(`0-${i}`) || p);
 
-    let urls = null;
-    const whole = findAudioMatch(sandhiSylls);
-    if (whole) {
-      urls = [whole.url];
-    } else {
-      const perSyll = sandhiSylls.map(s => findAudioMatch([s]));
-      if (perSyll.every(Boolean)) urls = perSyll.map(p => p.url);
-    }
-    if (!urls) return { ok: false, reason: 'notfound' };
-
     try {
-      // combineToWav 內部的 fetch 沒有逾時機制（瀏覽器預設不會自己斷線），網路狀況不好
-      // 或代理伺服器沒回應時可能一直卡著——存檔這個動作不能被這個「錦上添花」的自動合成
-      // 卡死，逾時就放棄，改成沒有音檔，使用者可以之後自己補。逾時後底下那個 fetch 可能
-      // 還在跑，就讓它自己跑完丟掉結果，不用特地取消，反正結果不會再被用到。
+      // combineToWav／fetchAudioBytes 內部的 fetch 沒有逾時機制（瀏覽器預設不會自己
+      // 斷線），網路狀況不好或代理伺服器沒回應時可能一直卡著——存檔這個動作不能被這個
+      // 「錦上添花」的自動合成卡死，逾時就放棄，改成沒有音檔，使用者可以之後自己補。
+      // 逾時後底下的 fetch 可能還在跑，就讓它自己跑完丟掉結果，不用特地取消。這個
+      // timeout 是「整個自動合成流程」共用的總預算（找候選＋合併都算在內），不是
+      // 每一步各自 10 秒。
       const TIMEOUT_MS = 10000;
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS));
-      const blob = await Promise.race([AudioExport.combineToWav(urls), timeout]);
+
+      const found = await Promise.race([(async () => {
+        // 先試整個詞當一組候選（同音的其他詞可能不只一個），找到一個位元組真的抓得到
+        // 的就用；每個候選字的音檔存不存在，只有實際試抓過才知道（辭典資料裡列了 id
+        // 不代表教育部真的錄過那個字），所以要逐一試，不是找到第一個「有 id」的就當作
+        // 可用。整詞都試過還是不行，才拆開逐音節各自試；逐音節一樣是每個音節各自把
+        // 同音候選字試過一輪，全部都抓不到那個音節才整個詞放棄（不要播一半借到、一半
+        // 沒聲音的破碎結果，跟 applyAudioFallback 的原則一致）。
+        const whole = await findWorkingAudioUrl(findAudioCandidates(sandhiSylls));
+        if (whole) return { urls: [whole.url] };
+
+        const perSyll = [];
+        for (const s of sandhiSylls) {
+          const hit = await findWorkingAudioUrl(findAudioCandidates([s]));
+          if (!hit) return null;
+          perSyll.push(hit);
+        }
+        return { urls: perSyll.map(p => p.url) };
+      })(), timeout]);
+
+      if (!found) return { ok: false, reason: 'notfound' };
+
+      const blob = await Promise.race([AudioExport.combineToWav(found.urls), timeout]);
       const filename = `auto-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}.wav`;
       const file = new File([blob], filename, { type: 'audio/wav' });
       await Dict.importAudioFiles([file]);

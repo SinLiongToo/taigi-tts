@@ -143,7 +143,9 @@ flowchart LR
 
 ## 修改日誌
 
-- **v1.14.0 — 2026-09-12**
+- **v1.14.1 — 2026-09-12**
+  - 修正自動合成音檔常常失敗的問題：`app.js` 新增 `findAudioCandidates()`（回傳「所有」同音候選，不只第一個）與 `findWorkingAudioUrl()`（依序實際試抓每個候選的位元組，抓不到就換下一個），`autoSynthesizeAudio()` 改用這兩個函式，不再是找到第一個「有音檔 id」的候選就直接用——教育部辭典資料裡不少字雖然列了音檔編號，實際上並沒有真的錄過單字音（「單字不成詞者不單獨錄音」，見「資料來源」），之前遇到這種情況會直接判定整個詞合成失敗
+  - `export.js` 額外匯出 `fetchAudioBytes`，供上述候選試抓使用
   - 語速選項加到 6×（原本最高 4×）
   - 修正語速選單其實一直沒有真的生效的 bug：`app.js` 的 `makeAudio()` 原本在呼叫 `audio.load()` 之前就設定 `playbackRate`，但瀏覽器的 `load()` 會把 `playbackRate` 重設回 1，等於白設，所有播放不論選哪個語速實際上都是 1×。改成 `load()` 之後才設定 `playbackRate`（實測用 Playwright 直接攔截 `HTMLMediaElement.prototype.play` 確認過，`load()` 前設定會被重設、`load()` 後設定會在整個載入過程中保留）
 - **v1.13.0 — 2026-09-12**

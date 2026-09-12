@@ -166,13 +166,24 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
 - **`tokenEditorSave` 存檔時若沒有選音檔案，會呼叫 `app.js` 的 `autoSynthesizeAudio(parsed)`
   自動嘗試合成一個音檔，不是單純留空。** 作法：把這個詞當成獨立一個 word token 丟進
   `computeSandhiSyllables` 算出它自己的變調（word-internal，跟畫面上單獨打這個詞會顯示的
-  「變調後」列一樣），再用跟 `applyAudioFallback` 相同的 `findAudioMatch`（先整詞查、查不到
-  才逐音節查、逐音節時要求每個音節都借得到）找候選音檔網址，找到就丟給
-  `AudioExport.combineToWav`（跟「下載語音」合併下載同一支函式，內部一樣會經過
+  「變調後」列一樣），再用 `findAudioCandidates` 找同音候選（先整詞查、查不到才逐音節查），
+  找到就丟給 `AudioExport.combineToWav`（跟「下載語音」合併下載同一支函式，內部一樣會經過
   `fetchAudioBytes` 的三層 CORS 繞過機制）合併成一個 WAV，再用 `Dict.importAudioFiles`
   存成使用者自訂音檔（檔名 `auto-<timestamp>-<random>.wav`）。任何一步找不到或讀不到位元組
   （沒有 serve.py／Cloudflare Worker）都要吞掉、回傳「沒有音檔」，不能讓存檔這個動作本身
-  失敗——讀音有沒有存到跟音檔合不合成得出來是兩件事，不要耦合在一起。**存檔前一定要先呼叫
+  失敗——讀音有沒有存到跟音檔合不合成得出來是兩件事，不要耦合在一起。
+  **重要：`findAudioCandidates` 回傳的是「所有」同音候選，不是只有第一個，因為辭典資料裡
+  列了音檔 id 不代表教育部真的錄過那個字的單字音——「單字不成詞者不單獨錄音」是教育部
+  錄音時的既定原則（見 README「資料來源」），實測過真實案例：「台」變調後 tāi7 跟「代」
+  同音，辭典資料裡「代」確實有 id，但那個 id 對應的檔案在 `r2-assets.moedict.tw` 上直接
+  404，不是代理伺服器的問題（直接打 Cloudflare Worker 跟官方來源都驗證過，Worker 本身
+  正常，只是上游真的沒有這個檔案）。所以只挑第一個候選、假設「有 id 就等於有錄音」是錯的，
+  一定要用 `findWorkingAudioUrl` 依序實際 `fetchAudioBytes` 試抓過，抓不到就換下一個候選字，
+  全部候選都抓不到那個音節才算失敗。這個「試抓、失敗換下一個」的邏輯只用在自動合成這條
+  路徑（本來就是非同步、本來就會真的發 fetch）——`applyAudioFallback`（畫面即時播放）維持
+  用只挑第一個候選的 `findAudioMatch`，不要比照套用，因為那條路徑是同步的架構，沒辦法在
+  決定要不要用某個候選之前先真的發 fetch 確認位元組抓不抓得到，這是已知、刻意接受的限制，
+  不是還沒修的 bug。**存檔前一定要先呼叫
   `Dict.findCustomAudio(hanzi, trs)` 檢查這個詞是不是已經有音檔（自己上傳或先前自動合成
   的都算）**，有的話直接沿用那個值，不要再嘗試合成或留空——`tokenEditorAudio` 這個
   `<input type="file">` 出於瀏覽器安全限制，每次重新打開編輯面板一定是空的（沒辦法用 JS

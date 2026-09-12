@@ -105,5 +105,9 @@ const AudioExport = (() => {
     }
   }
 
-  return { combineToWav };
+  // 匯出 fetchAudioBytes 給 app.js 的自動合成功能用來「試探」某個候選音檔的位元組
+  // 抓不抓得到，藉此在真的合成之前先跳過抓不到的同音字候選（例如辭典資料裡列了
+  // id、但教育部其實沒有錄那個字的單字音檔），改試下一個候選字——不是每個 id
+  // 都對應到真的存在的檔案，見 combineToWav 開頭那段 CORS／資料限制的註解。
+  return { combineToWav, fetchAudioBytes };
 })();

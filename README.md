@@ -143,6 +143,9 @@ flowchart LR
 
 ## 修改日誌
 
+- **v1.14.0 — 2026-09-12**
+  - 語速選項加到 6×（原本最高 4×）
+  - 修正語速選單其實一直沒有真的生效的 bug：`app.js` 的 `makeAudio()` 原本在呼叫 `audio.load()` 之前就設定 `playbackRate`，但瀏覽器的 `load()` 會把 `playbackRate` 重設回 1，等於白設，所有播放不論選哪個語速實際上都是 1×。改成 `load()` 之後才設定 `playbackRate`（實測用 Playwright 直接攔截 `HTMLMediaElement.prototype.play` 確認過，`load()` 前設定會被重設、`load()` 後設定會在整個載入過程中保留）
 - **v1.13.0 — 2026-09-12**
   - 補上讀音時若沒有上傳音檔，`app.js` 新增 `autoSynthesizeAudio()`：用跟「下載語音」相同的 `AudioExport.combineToWav` 機制，借用這個詞（word-internal 變調後）同音字的官方錄音組合成一個 WAV，自動存進自訂音檔（`Dict.importAudioFiles`）當作這筆自訂詞的音檔。找不到可借用的錄音、或目前環境讀不到官方音檔位元組（沒有 serve.py／Cloudflare Worker）時，維持原本「留空、之後可自行上傳」的行為，不擋住存檔
   - `dict.js` 新增 `findCustomAudio(hanzi, trs)`：重新編輯一個已經有音檔（自己上傳或自動合成皆可）的詞、這次沒有重新選檔案時，會先查出原本的音檔沿用，不會被清空或被新的自動合成結果覆蓋（檔案選取欄位每次打開編輯面板都是空的，「這次沒選檔案」不代表「本來就沒有音檔」）

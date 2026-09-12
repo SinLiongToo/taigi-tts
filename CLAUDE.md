@@ -98,6 +98,15 @@ Cloudflare 帳號），`export.js` 的 `EXTERNAL_PROXY_BASE` 常數填了那個 
   resolve）。任何以後要改播放邏輯、或想用 `AbortController` 之類的東西重寫這段，都要
   確認「使用者中途打斷播放」這條路徑真的會讓正在 `await` 的 Promise 走到底，不要只測
   「播完整句」這種正常路徑。
+- **`makeAudio()` 裡 `audio.playbackRate` 一定要在 `audio.load()` 之後設定，不能在之前。**
+  踩過的坑：瀏覽器的 `HTMLMediaElement.load()` 會把 `playbackRate` 重設回 1——原本的寫法是
+  先設定 `playbackRate` 再呼叫 `load()`，等於白設，導致語速選單從第一版到 v1.13.0 都其實
+  沒有真的生效過（不管選哪個速度，實際播放永遠是 1×），只是沒人用 Playwright 直接檢查過
+  真正在播放的 `<audio>` 元素本身的 `playbackRate` 屬性，光看畫面（速度數字有變、UI 有反應）
+  看不出來。已經實測驗證過：`load()` 前設定會在 `load()` 完後被重設回 1，`load()` 後設定
+  則會在整個載入過程（`loadedmetadata`、`canplay`）中正確保留。以後任何要改這段音檔建立
+  邏輯的地方，都要留意這個順序，不要因為「反正看起來能動」就假設語速真的有作用，要實際
+  攔截 `.play()` 呼叫當下的 `playbackRate` 值來確認。
 - **`style.css` 開頭有一條 `[hidden] { display: none !important; }`，不要拿掉。** 踩過的坑：
   `.token-editor` 自己設了 `display: flex`（沒有 `!important`），跟瀏覽器內建的
   `[hidden] { display: none }` UA 樣式比，author 樣式規則永遠贏過 UA 樣式規則（同樣是一般

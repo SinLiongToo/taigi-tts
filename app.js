@@ -651,8 +651,11 @@
   function makeAudio(url) {
     const audio = new Audio(url);
     audio.preload = 'auto';
-    audio.playbackRate = parseFloat(speedSelect.value) || 1;
     audio.load();
+    // load() 一定要在設定 playbackRate 之前呼叫——瀏覽器的 load() 會把 playbackRate
+    // 重設回 1，先設再 load() 等於白設，導致語速選單其實從來沒真的生效過（實測
+    // 用 Playwright 直接檢查過：先設後 load，load 完 playbackRate 變回 1）。
+    audio.playbackRate = parseFloat(speedSelect.value) || 1;
     return audio;
   }
 
